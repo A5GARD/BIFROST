@@ -1,15 +1,15 @@
 {
   "name": "@a5gard/bifrost",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Platform-agnostic project creator with extensible template system",
   "type": "module",
   "bin": {
     "create-bifrost": "./dist/index.js"
   },
   "scripts": {
-      "copy-registry": "bun copy-registry.js",
-  "build:tsup": "tsup src/index.ts --format esm --dts --clean",
-  "build": "npm run copy-registry && npm run build:tsup",
+    "copy-registry": "bun copy-registry.js",
+    "build:tsup": "tsup src/index.ts --format esm --dts --clean",
+    "build": "npm run copy-registry && npm run build:tsup",
     "dev": "tsc --watch",
     "prepublishOnly": "npm run build"
   },
