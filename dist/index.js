@@ -2,7 +2,7 @@
 
 // src/cli.ts
 import { Command } from "commander";
-import chalk3 from "chalk";
+import chalk5 from "chalk";
 
 // src/constants.ts
 var PLATFORMS = {
@@ -288,6 +288,18 @@ async function promptForMissingOptions(projectName, template, packageManager, in
     message: "Would you like to auto create and push the first commit to GitHub?",
     initial: false
   });
+  questions.push({
+    type: "confirm",
+    name: "runWizard",
+    message: "Would you like to run the config.bifrost wizard?",
+    initial: false
+  });
+  questions.push({
+    type: "confirm",
+    name: "submitToRegistry",
+    message: "Would you like to submit your template to the bifrost registry?",
+    initial: false
+  });
   const answers = await prompts(questions, {
     onCancel: () => {
       console.log("\nOperation cancelled");
@@ -312,7 +324,9 @@ async function promptForMissingOptions(projectName, template, packageManager, in
     template: finalStack,
     packageManager: packageManager || answers.packageManager,
     install: install !== void 0 ? install : answers.install,
-    gitPush: answers.gitPush
+    gitPush: answers.gitPush,
+    runWizard: answers.runWizard,
+    submitToRegistry: answers.submitToRegistry
   };
 }
 
@@ -677,23 +691,333 @@ async function createProject(context) {
   console.log();
 }
 
+// src/wizard.ts
+import fs6 from "fs-extra";
+import path5 from "path";
+import chalk3 from "chalk";
+import prompts3 from "prompts";
+import { execSync } from "child_process";
+async function detectGitHubRepo() {
+  try {
+    const remote = execSync("git config --get remote.origin.url", { encoding: "utf-8" }).trim();
+    const match = remote.match(/github\.com[:/](.+?)(?:\.git)?$/);
+    if (match) {
+      return match[1];
+    }
+  } catch {
+  }
+  try {
+    const packageJsonPath = path5.join(process.cwd(), "package.json");
+    if (await fs6.pathExists(packageJsonPath)) {
+      const packageJson = await fs6.readJson(packageJsonPath);
+      if (packageJson.repository) {
+        const repoUrl = typeof packageJson.repository === "string" ? packageJson.repository : packageJson.repository.url;
+        const match = repoUrl.match(/github\.com[:/](.+?)(?:\.git)?$/);
+        if (match) {
+          return match[1];
+        }
+      }
+    }
+  } catch {
+  }
+  return null;
+}
+async function promptForGitHubRepo() {
+  console.log(chalk3.yellow("\n\u26A0 No GitHub repository detected"));
+  console.log(chalk3.gray("Please push your project and create a public repository\n"));
+  const { hasRepo } = await prompts3({
+    type: "confirm",
+    name: "hasRepo",
+    message: "Have you created a public GitHub repository?",
+    initial: false
+  });
+  if (!hasRepo) {
+    console.log(chalk3.red("\nPlease create a public GitHub repository first"));
+    process.exit(1);
+  }
+  const { repo } = await prompts3({
+    type: "text",
+    name: "repo",
+    message: "Enter your GitHub repository (owner/repo):",
+    validate: (value) => {
+      const pattern = /^[\w-]+\/[\w-]+$/;
+      return pattern.test(value) || "Invalid format. Use: owner/repo";
+    }
+  });
+  if (!repo) {
+    console.log(chalk3.red("\nRepository is required"));
+    process.exit(1);
+  }
+  return repo;
+}
+async function runConfigWizard() {
+  console.log(chalk3.blue.bold("\n\u{1F9D9} Config.bifrost Wizard\n"));
+  const configPath = path5.join(process.cwd(), "config.bifrost");
+  if (await fs6.pathExists(configPath)) {
+    const { overwrite } = await prompts3({
+      type: "confirm",
+      name: "overwrite",
+      message: "config.bifrost already exists. Overwrite?",
+      initial: false
+    });
+    if (!overwrite) {
+      const existingConfig = await fs6.readJson(configPath);
+      return existingConfig;
+    }
+  }
+  const detectedRepo = await detectGitHubRepo();
+  const responses = await prompts3([
+    {
+      type: "text",
+      name: "name",
+      message: "Template name:",
+      validate: (value) => value.trim().length > 0 || "Name is required"
+    },
+    {
+      type: "text",
+      name: "description",
+      message: "Description:",
+      validate: (value) => value.trim().length > 0 || "Description is required"
+    },
+    {
+      type: "text",
+      name: "platform",
+      message: "Platform:",
+      initial: "remix",
+      validate: (value) => value.trim().length > 0 || "Platform is required"
+    },
+    {
+      type: "text",
+      name: "github",
+      message: "GitHub repository (owner/repo):",
+      initial: detectedRepo || "",
+      validate: (value) => {
+        const pattern = /^[\w-]+\/[\w-]+$/;
+        return pattern.test(value) || "Invalid format. Use: owner/repo";
+      }
+    },
+    {
+      type: "text",
+      name: "tags",
+      message: "Tags (comma-separated):",
+      validate: (value) => value.trim().length > 0 || "At least one tag is required"
+    },
+    {
+      type: "text",
+      name: "postInstall",
+      message: "Post-install scripts (comma-separated npm script names):",
+      initial: ""
+    },
+    {
+      type: "text",
+      name: "plugins",
+      message: "Plugins to include (comma-separated owner/repo):",
+      initial: ""
+    }
+  ]);
+  if (!responses.name) {
+    console.log(chalk3.red("\nWizard cancelled"));
+    process.exit(1);
+  }
+  if (!detectedRepo && !responses.github) {
+    responses.github = await promptForGitHubRepo();
+  }
+  const config = {
+    name: responses.name,
+    description: responses.description,
+    platform: responses.platform,
+    github: responses.github,
+    tags: responses.tags.split(",").map((t) => t.trim()).filter(Boolean),
+    postInstall: responses.postInstall ? responses.postInstall.split(",").map((s) => s.trim()).filter(Boolean) : [],
+    plugins: responses.plugins ? responses.plugins.split(",").map((p) => p.trim()).filter(Boolean) : []
+  };
+  await fs6.writeJson(configPath, config, { spaces: 2 });
+  console.log(chalk3.green("\n\u2705 config.bifrost created successfully!\n"));
+  console.log(chalk3.cyan("Configuration:"));
+  console.log(chalk3.gray("\u2500".repeat(50)));
+  console.log(chalk3.white(JSON.stringify(config, null, 2)));
+  console.log(chalk3.gray("\u2500".repeat(50)));
+  return config;
+}
+
+// src/templateSubmitter.ts
+import fs7 from "fs-extra";
+import path6 from "path";
+import chalk4 from "chalk";
+import prompts4 from "prompts";
+import { execSync as execSync2 } from "child_process";
+var REGISTRY_REPO = "A5GARD/BIFROST";
+var REGISTRY_FILE = "dist/registry.bifrost";
+async function verifyPublicRepo(github) {
+  try {
+    const response = await fetch(`https://api.github.com/repos/${github}`);
+    if (!response.ok) return false;
+    const data = await response.json();
+    return !data.private;
+  } catch {
+    return false;
+  }
+}
+async function submitTemplate() {
+  console.log(chalk4.blue.bold("\n\u{1F4E4} Submit Template to Registry\n"));
+  const configPath = path6.join(process.cwd(), "config.bifrost");
+  let config;
+  if (!await fs7.pathExists(configPath)) {
+    console.log(chalk4.yellow("\u26A0 config.bifrost not found\n"));
+    const { runWizard } = await prompts4({
+      type: "confirm",
+      name: "runWizard",
+      message: "Would you like to run the config wizard to create it?",
+      initial: true
+    });
+    if (!runWizard) {
+      console.log(chalk4.red("\nconfig.bifrost is required for submission"));
+      process.exit(1);
+    }
+    config = await runConfigWizard();
+  } else {
+    config = await fs7.readJson(configPath);
+  }
+  console.log(chalk4.blue("\n\u{1F50D} Verifying repository..."));
+  const isPublic = await verifyPublicRepo(config.github);
+  if (!isPublic) {
+    console.log(chalk4.red("\n\u274C Repository must be public"));
+    console.log(chalk4.yellow("Please make your repository public before submitting"));
+    const { madePublic } = await prompts4({
+      type: "confirm",
+      name: "madePublic",
+      message: "Have you made the repository public?",
+      initial: false
+    });
+    if (!madePublic) {
+      console.log(chalk4.red("\nSubmission cancelled"));
+      process.exit(1);
+    }
+    const stillNotPublic = await verifyPublicRepo(config.github);
+    if (!stillNotPublic) {
+      console.log(chalk4.red("\n\u274C Repository is still not public"));
+      process.exit(1);
+    }
+  }
+  console.log(chalk4.cyan("\nTemplate Information:"));
+  console.log(chalk4.gray("\u2500".repeat(50)));
+  console.log(`Name: ${chalk4.white(config.name)}`);
+  console.log(`Description: ${chalk4.white(config.description)}`);
+  console.log(`Platform: ${chalk4.white(config.platform)}`);
+  console.log(`GitHub: ${chalk4.white(config.github)}`);
+  console.log(`Tags: ${chalk4.white(config.tags.join(", "))}`);
+  if (config.postInstall.length > 0) {
+    console.log(`Post-Install: ${chalk4.white(config.postInstall.join(", "))}`);
+  }
+  if (config.plugins.length > 0) {
+    console.log(`Plugins: ${chalk4.white(config.plugins.join(", "))}`);
+  }
+  console.log(chalk4.gray("\u2500".repeat(50)));
+  const { confirm } = await prompts4({
+    type: "confirm",
+    name: "confirm",
+    message: "Submit this template to the registry?",
+    initial: true
+  });
+  if (!confirm) {
+    console.log(chalk4.yellow("\nSubmission cancelled"));
+    process.exit(0);
+  }
+  try {
+    const [owner, repo] = config.github.split("/");
+    const registryEntry = {
+      owner,
+      repo,
+      description: config.description,
+      platform: config.platform,
+      tags: config.tags
+    };
+    console.log(chalk4.blue("\n\u{1F504} Forking registry repository..."));
+    execSync2(`gh repo fork ${REGISTRY_REPO} --clone=false`, { stdio: "inherit" });
+    const username = execSync2("gh api user -q .login", { encoding: "utf-8" }).trim();
+    const forkRepo = `${username}/BIFROST`;
+    console.log(chalk4.blue("\u{1F4E5} Cloning forked repository..."));
+    const tempDir = path6.join(process.cwd(), ".bifrost-temp");
+    await fs7.ensureDir(tempDir);
+    execSync2(`gh repo clone ${forkRepo} ${tempDir}`, { stdio: "inherit" });
+    console.log(chalk4.blue("\u{1F4CB} Fetching current registry..."));
+    const registryUrl = `https://raw.githubusercontent.com/${REGISTRY_REPO}/main/${REGISTRY_FILE}`;
+    const registryResponse = await fetch(registryUrl);
+    let registry = [];
+    if (registryResponse.ok) {
+      registry = await registryResponse.json();
+    }
+    const registryPath = path6.join(tempDir, REGISTRY_FILE);
+    await fs7.ensureDir(path6.dirname(registryPath));
+    const existingIndex = registry.findIndex((t) => t.owner === owner && t.repo === repo);
+    if (existingIndex !== -1) {
+      console.log(chalk4.yellow("\n\u26A0 Template already exists in registry. Updating..."));
+      registry[existingIndex] = registryEntry;
+    } else {
+      registry.push(registryEntry);
+    }
+    await fs7.writeJson(registryPath, registry, { spaces: 2 });
+    console.log(chalk4.blue("\u{1F4BE} Committing changes..."));
+    process.chdir(tempDir);
+    execSync2("git add .", { stdio: "inherit" });
+    execSync2(`git commit -m "Add/Update template: ${config.name}"`, { stdio: "inherit" });
+    execSync2("git push", { stdio: "inherit" });
+    console.log(chalk4.blue("\u{1F500} Creating pull request..."));
+    const prUrl = execSync2(
+      `gh pr create --repo ${REGISTRY_REPO} --title "Add template: ${config.name}" --body "Submitting template ${config.name} to the registry.
+
+Platform: ${config.platform}
+Description: ${config.description}"`,
+      { encoding: "utf-8" }
+    ).trim();
+    process.chdir("..");
+    await fs7.remove(tempDir);
+    console.log(chalk4.green.bold("\n\u2728 Template submitted successfully!\n"));
+    console.log(chalk4.cyan("Pull Request:"), chalk4.white(prUrl));
+    console.log(chalk4.gray("\nYour template will be available once the PR is merged."));
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("gh: command not found")) {
+      console.log(chalk4.red("\n\u274C GitHub CLI (gh) is not installed"));
+      console.log(chalk4.yellow("\nManual submission steps:"));
+      console.log(chalk4.gray(`1. Fork the repository: https://github.com/${REGISTRY_REPO}`));
+      console.log(chalk4.gray(`2. Clone your fork`));
+      console.log(chalk4.gray(`3. Add your template to ${REGISTRY_FILE}`));
+      console.log(chalk4.gray(`4. Commit and push changes`));
+      console.log(chalk4.gray(`5. Create a pull request`));
+    } else {
+      throw error;
+    }
+  }
+}
+
 // src/cli.ts
-var registryFile = Bun.file(new URL("../registry.bifrost", import.meta.url));
-var DEFAULT_STACKS = await registryFile.json();
+async function loadRegistry() {
+  const registryFile = Bun.file(new URL("../registry.bifrost", import.meta.url));
+  return await registryFile.json();
+}
 async function runCLI(argv) {
+  const DEFAULT_STACKS = await loadRegistry();
   const program = new Command();
-  program.name("create-bifrost").description("Create a new project with platform-agnostic templates").version("1.0.0").argument("[projectName]", "The project name").option("-t, --template <owner/repo>", "The template to use (format: owner/repo)").option("-p, --pkg-mgr <pm>", `Package manager to use (${PACKAGE_MANAGERS.join(", ")})`).option("--no-install", "Skip dependency installation").option("--list-templates", "List all available community templates").option("-h, --help", "Show help").action(async (projectName, options) => {
+  program.name("@a5gard/bifrost").description("Create a new project with platform-agnostic templates").version("1.0.0").argument("[projectName]", "The project name").option("-t, --template <owner/repo>", "The template to use (format: owner/repo)").option("-p, --pkg-mgr <pm>", `Package manager to use (${PACKAGE_MANAGERS.join(", ")})`).option("--no-install", "Skip dependency installation").option("--list-templates", "List all available community templates").option("--wizard", "Run config.bifrost wizard").option("--submit", "Submit template to bifrost registry").option("-h, --help", "Show help").action(async (projectName, options) => {
     if (options.help) {
       showHelp();
       process.exit(0);
     }
     if (options.listTemplates) {
-      showTemplates();
+      showTemplates(DEFAULT_STACKS);
+      process.exit(0);
+    }
+    if (options.wizard) {
+      await runConfigWizard();
+      process.exit(0);
+    }
+    if (options.submit) {
+      await submitTemplate();
       process.exit(0);
     }
     try {
       if (options.pkgMgr && !PACKAGE_MANAGERS.includes(options.pkgMgr)) {
-        console.error(chalk3.red(`Invalid package manager. Must be one of: ${PACKAGE_MANAGERS.join(", ")}`));
+        console.error(chalk5.red(`Invalid package manager. Must be one of: ${PACKAGE_MANAGERS.join(", ")}`));
         process.exit(1);
       }
       let finalProjectName = projectName;
@@ -711,6 +1035,8 @@ async function runCLI(argv) {
       finalPackageManager = prompted.packageManager;
       finalInstall = prompted.install;
       const gitPush = prompted.gitPush;
+      const runWizard = prompted.runWizard;
+      const submitToRegistry = prompted.submitToRegistry;
       const validProjectName = toValidPackageName(finalProjectName);
       await createProject({
         projectName: validProjectName,
@@ -719,9 +1045,15 @@ async function runCLI(argv) {
         install: finalInstall,
         gitPush
       });
+      if (runWizard) {
+        await runConfigWizard();
+      }
+      if (submitToRegistry) {
+        await submitTemplate();
+      }
     } catch (error) {
       console.error();
-      console.error(chalk3.red("Error:"), error instanceof Error ? error.message : "Unknown error");
+      console.error(chalk5.red("Error:"), error instanceof Error ? error.message : "Unknown error");
       console.error();
       process.exit(1);
     }
@@ -730,32 +1062,36 @@ async function runCLI(argv) {
 }
 function showHelp() {
   console.log(`
-${chalk3.bold("Usage:")}
+${chalk5.bold("Usage:")}
 
-  ${chalk3.cyan("$ bunx create-bifrost")} ${chalk3.gray("<projectName> <...options>")}
+  ${chalk5.cyan("$ bunx @a5gard/bifrost")} ${chalk5.gray("<projectName> <...options>")}
 
-${chalk3.bold("Examples:")}
+${chalk5.bold("Examples:")}
 
-  ${chalk3.cyan("$ bunx create-bifrost")}
-  ${chalk3.cyan("$ bunx create-bifrost my-app")}
-  ${chalk3.cyan("$ bunx create-bifrost my-app --template remix-run/indie-template")}
-  ${chalk3.cyan("$ bunx create-bifrost my-app -s owner/repo -p bun")}
-  ${chalk3.cyan("$ bunx create-bifrost my-app -s owner/repo --no-install")}
-  ${chalk3.cyan("$ bunx create-bifrost --list-templates")}
+  ${chalk5.cyan("$ bunx @a5gard/bifrost")}
+  ${chalk5.cyan("$ bunx @a5gard/bifrost my-app")}
+  ${chalk5.cyan("$ bunx @a5gard/bifrost my-app --template remix-run/indie-template")}
+  ${chalk5.cyan("$ bunx @a5gard/bifrost my-app -s owner/repo -p bun")}
+  ${chalk5.cyan("$ bunx @a5gard/bifrost my-app -s owner/repo --no-install")}
+  ${chalk5.cyan("$ bunx @a5gard/bifrost --list-templates")}
+  ${chalk5.cyan("$ bunx @a5gard/bifrost --wizard")}
+  ${chalk5.cyan("$ bunx @a5gard/bifrost --submit")}
 
-${chalk3.bold("Options:")}
+${chalk5.bold("Options:")}
 
-  ${chalk3.cyan("--help, -h")}          Print this help message
-  ${chalk3.cyan("--version, -V")}       Print the CLI version
-  ${chalk3.cyan("--template, -s")}         Stack to use (format: owner/repo)
-  ${chalk3.cyan("--pkg-mgr, -p")}       Package manager (npm, pnpm, yarn, bun)
-  ${chalk3.cyan("--no-install")}        Skip dependency installation
-  ${chalk3.cyan("--list-templates")}    List all available community templates
+  ${chalk5.cyan("--help, -h")}          Print this help message
+  ${chalk5.cyan("--version, -V")}       Print the CLI version
+  ${chalk5.cyan("--template, -s")}         Stack to use (format: owner/repo)
+  ${chalk5.cyan("--pkg-mgr, -p")}       Package manager (npm, pnpm, yarn, bun)
+  ${chalk5.cyan("--no-install")}        Skip dependency installation
+  ${chalk5.cyan("--list-templates")}    List all available community templates
+  ${chalk5.cyan("--wizard")}            Run config.bifrost wizard
+  ${chalk5.cyan("--submit")}            Submit template to bifrost registry
   `);
 }
-function showTemplates() {
+function showTemplates(DEFAULT_STACKS) {
   console.log();
-  console.log(chalk3.bold("Available Community Templates"));
+  console.log(chalk5.bold("Available Community Templates"));
   console.log();
   const groupedByPlatform = DEFAULT_STACKS.reduce((acc, template) => {
     if (!acc[template.platform]) {
@@ -765,16 +1101,16 @@ function showTemplates() {
     return acc;
   }, {});
   Object.entries(groupedByPlatform).forEach(([platform, template]) => {
-    console.log(chalk3.bold.cyan(`${platform.toUpperCase()}`));
+    console.log(chalk5.bold.cyan(`${platform.toUpperCase()}`));
     console.log();
     template.forEach((template2) => {
-      console.log(`  ${chalk3.green("\u203A")} ${chalk3.bold(`${template2.owner}/${template2.repo}`)}`);
-      console.log(`    ${chalk3.gray(template2.description)}`);
-      console.log(`    ${chalk3.gray(`Tags: ${template2.tags.join(", ")}`)}`);
+      console.log(`  ${chalk5.green("\u203A")} ${chalk5.bold(`${template2.owner}/${template2.repo}`)}`);
+      console.log(`    ${chalk5.gray(template2.description)}`);
+      console.log(`    ${chalk5.gray(`Tags: ${template2.tags.join(", ")}`)}`);
       console.log();
     });
   });
-  console.log(chalk3.gray("Use any template with: ") + chalk3.cyan("bunx create-bifrost my-app --template owner/repo"));
+  console.log(chalk5.gray("Use any template with: ") + chalk5.cyan("bunx @a5gard/bifrost my-app --template owner/repo"));
   console.log();
 }
 

@@ -42,6 +42,7 @@ export interface ProjectContext {
   packageManager: PackageManager;
   install: boolean;
   gitPush: boolean;
+  runWizard?: boolean;
 }
 
 export interface DefaultStack {

@@ -6,15 +6,20 @@ import { PACKAGE_MANAGERS } from './constants';
 import { promptForMissingOptions } from './prompts';
 import { createProject } from './creator';
 import { toValidPackageName } from './utilts';
+import { runConfigWizard } from './wizard';
+import { submitTemplate } from './templateSubmitter';
 
-const registryFile = Bun.file(new URL('../registry.bifrost', import.meta.url));
-const DEFAULT_STACKS: DefaultStack[] = await registryFile.json();
+async function loadRegistry(): Promise<DefaultStack[]> {
+  const registryFile = Bun.file(new URL('../registry.bifrost', import.meta.url));
+  return await registryFile.json();
+}
 
 export async function runCLI(argv: string[]): Promise<void> {
+  const DEFAULT_STACKS = await loadRegistry();
   const program = new Command();
 
   program
-    .name('create-bifrost')
+    .name('@a5gard/bifrost')
     .description('Create a new project with platform-agnostic templates')
     .version('1.0.0')
     .argument('[projectName]', 'The project name')
@@ -22,15 +27,27 @@ export async function runCLI(argv: string[]): Promise<void> {
     .option('-p, --pkg-mgr <pm>', `Package manager to use (${PACKAGE_MANAGERS.join(', ')})`)
     .option('--no-install', 'Skip dependency installation')
     .option('--list-templates', 'List all available community templates')
+    .option('--wizard', 'Run config.bifrost wizard')
+    .option('--submit', 'Submit template to bifrost registry')
     .option('-h, --help', 'Show help')
-    .action(async (projectName: string | undefined, options: CLIOptions & { listTemplates?: boolean }) => {
+    .action(async (projectName: string | undefined, options: CLIOptions & { listTemplates?: boolean; wizard?: boolean; submit?: boolean }) => {
       if (options.help) {
         showHelp();
         process.exit(0);
       }
 
       if (options.listTemplates) {
-        showTemplates();
+        showTemplates(DEFAULT_STACKS);
+        process.exit(0);
+      }
+
+      if (options.wizard) {
+        await runConfigWizard();
+        process.exit(0);
+      }
+
+      if (options.submit) {
+        await submitTemplate();
         process.exit(0);
       }
 
@@ -57,6 +74,8 @@ export async function runCLI(argv: string[]): Promise<void> {
         finalPackageManager = prompted.packageManager;
         finalInstall = prompted.install;
         const gitPush = prompted.gitPush;
+        const runWizard = prompted.runWizard;
+        const submitToRegistry = prompted.submitToRegistry;
 
         const validProjectName = toValidPackageName(finalProjectName);
 
@@ -67,6 +86,14 @@ export async function runCLI(argv: string[]): Promise<void> {
           install: finalInstall,
           gitPush
         });
+
+        if (runWizard) {
+          await runConfigWizard();
+        }
+
+        if (submitToRegistry) {
+          await submitTemplate();
+        }
 
       } catch (error) {
         console.error();
@@ -83,16 +110,18 @@ export function showHelp(): void {
   console.log(`
 ${chalk.bold('Usage:')}
 
-  ${chalk.cyan('$ bunx create-bifrost')} ${chalk.gray('<projectName> <...options>')}
+  ${chalk.cyan('$ bunx @a5gard/bifrost')} ${chalk.gray('<projectName> <...options>')}
 
 ${chalk.bold('Examples:')}
 
-  ${chalk.cyan('$ bunx create-bifrost')}
-  ${chalk.cyan('$ bunx create-bifrost my-app')}
-  ${chalk.cyan('$ bunx create-bifrost my-app --template remix-run/indie-template')}
-  ${chalk.cyan('$ bunx create-bifrost my-app -s owner/repo -p bun')}
-  ${chalk.cyan('$ bunx create-bifrost my-app -s owner/repo --no-install')}
-  ${chalk.cyan('$ bunx create-bifrost --list-templates')}
+  ${chalk.cyan('$ bunx @a5gard/bifrost')}
+  ${chalk.cyan('$ bunx @a5gard/bifrost my-app')}
+  ${chalk.cyan('$ bunx @a5gard/bifrost my-app --template remix-run/indie-template')}
+  ${chalk.cyan('$ bunx @a5gard/bifrost my-app -s owner/repo -p bun')}
+  ${chalk.cyan('$ bunx @a5gard/bifrost my-app -s owner/repo --no-install')}
+  ${chalk.cyan('$ bunx @a5gard/bifrost --list-templates')}
+  ${chalk.cyan('$ bunx @a5gard/bifrost --wizard')}
+  ${chalk.cyan('$ bunx @a5gard/bifrost --submit')}
 
 ${chalk.bold('Options:')}
 
@@ -102,10 +131,12 @@ ${chalk.bold('Options:')}
   ${chalk.cyan('--pkg-mgr, -p')}       Package manager (npm, pnpm, yarn, bun)
   ${chalk.cyan('--no-install')}        Skip dependency installation
   ${chalk.cyan('--list-templates')}    List all available community templates
+  ${chalk.cyan('--wizard')}            Run config.bifrost wizard
+  ${chalk.cyan('--submit')}            Submit template to bifrost registry
   `);
 }
 
-export function showTemplates(): void {
+export function showTemplates(DEFAULT_STACKS: DefaultStack[]): void {
   console.log();
   console.log(chalk.bold('Available Community Templates'));
   console.log();
@@ -130,6 +161,6 @@ export function showTemplates(): void {
     });
   });
 
-  console.log(chalk.gray('Use any template with: ') + chalk.cyan('bunx create-bifrost my-app --template owner/repo'));
+  console.log(chalk.gray('Use any template with: ') + chalk.cyan('bunx @a5gard/bifrost my-app --template owner/repo'));
   console.log();
 }

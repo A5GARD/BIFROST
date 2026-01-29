@@ -25,8 +25,37 @@ In interactive mode, the following prompts will display:
 - Which package manager do you prefer?
 - Would you like to have the install command run once the project has initialized?
 - Would you like to auto create and push the first commit to GitHub?
-- [!NEW] config.bifrost wizard
+- [!NEW] `config.bifrost` wizard
 - [!NEW] Submit template to bifrost registry
+
+
+### With Options
+
+```bash
+bunx @a5gard/bifrost my-app --template owner/repo --pkg-mgr bun
+```
+
+### Full Example
+
+```bash
+bunx @a5gard/bifrost my-app -s remix-run/indie-template -p bun
+```
+
+### Platform Templates
+
+```bash
+bunx @a5gard/bifrost my-app --list-templates
+```
+
+## Options
+
+| Flag | Alias | Description |
+|------|-------|-------------|
+| `--template` | `-s` | Stack to use (format: owner/repo) |
+| `--pkg-mgr` | `-p` | Package manager (npm, pnpm, yarn, bun) |
+| `--no-install` | | Skip dependency installation |
+| `--help` | `-h` | Show help |
+| `--version` | `-V` | Show version |
 
 ## `config.bifrost wizard`
 
@@ -64,82 +93,6 @@ As long as your project already has a public repo already in place, if not it wi
 bunx @a5gard/bifrost submit
 ```
 
-```json
-// dist/registry.bifrost
-[
-  {
-    "owner": "remix-run",
-    "repo": "indie-stack",
-    "description": "Remix Stack for indie developers",
-    "platform": "remix-run",
-    "tags": ["remix", "sqlite", "prisma"]
-  },
-  {
-    "owner": "remix-run",
-    "repo": "blues-stack",
-    "description": "Remix Stack with PostgreSQL",
-    "platform": "remix-run",
-    "tags": ["remix", "postgresql", "prisma"]
-  },
-  {
-    "owner": "remix-run",
-    "repo": "grunge-stack",
-    "description": "Remix Stack with AWS",
-    "platform": "remix-run",
-    "tags": ["remix", "aws", "dynamodb"]
-  },
-  {
-    "owner": "vercel",
-    "repo": "next.js",
-    "description": "Next.js starter",
-    "platform": "remix-run",
-    "tags": ["nextjs", "react", "vercel"]
-  },
-  {
-    "owner": "vitejs",
-    "repo": "vite",
-    "description": "Vite starter template",
-    "platform": "remix-run",
-    "tags": ["vite", "react"]
-  }
-]
-```
-
-### With Options
-
-```bash
-bunx @a5gard/bifrost my-app --template owner/repo --pkg-mgr bun
-```
-
-### Full Example
-
-```bash
-bunx @a5gard/bifrost my-app -s remix-run/indie-template -p bun
-```
-
-### Platform Templates
-
-```bash
-bunx @a5gard/bifrost my-app --list-templates
-```
-
-## Options
-
-| Flag | Alias | Description |
-|------|-------|-------------|
-| `--template` | `-s` | Stack to use (format: owner/repo) |
-| `--pkg-mgr` | `-p` | Package manager (npm, pnpm, yarn, bun) |
-| `--no-install` | | Skip dependency installation |
-| `--help` | `-h` | Show help |
-| `--version` | `-V` | Show version |
-
-## Creating Your Own Template
-
-Any GitHub repository can be used as a template. To make this process easier whenenver you create a project based off of a platforms base installer, a config file will be created for you in order to create and post your own template. If you want to create your own template based off of another, the original templates config will already be located within the root folder. All you have to do is edit the config in order meet your newly created projects use case needs.
-
-```bash
-bunx @a5gard/bifrost my-app --template name/repo
-```
 
 ### Stack Configuration (Optional)
 

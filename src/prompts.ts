@@ -1,3 +1,4 @@
+// src/prompts.ts
 import prompts from 'prompts';
 import { PLATFORMS, PACKAGE_MANAGERS } from './constants';
 import type { PackageManager } from './types'; 
@@ -14,6 +15,8 @@ export async function promptForMissingOptions(
   packageManager: PackageManager;
   install: boolean;
   gitPush: boolean;
+  runWizard: boolean;
+  submitToRegistry: boolean;
 }> {
   const detectedPM = await detectPackageManager();
   const questions: prompts.PromptObject[] = [];
@@ -109,6 +112,20 @@ export async function promptForMissingOptions(
     initial: false
   });
 
+  questions.push({
+    type: 'confirm',
+    name: 'runWizard',
+    message: 'Would you like to run the config.bifrost wizard?',
+    initial: false
+  });
+
+  questions.push({
+    type: 'confirm',
+    name: 'submitToRegistry',
+    message: 'Would you like to submit your template to the bifrost registry?',
+    initial: false
+  });
+
   const answers = await prompts(questions, {
     onCancel: () => {
       console.log('\nOperation cancelled');
@@ -136,6 +153,8 @@ export async function promptForMissingOptions(
     template: finalStack!,
     packageManager: packageManager || answers.packageManager,
     install: install !== undefined ? install : answers.install,
-    gitPush: answers.gitPush
+    gitPush: answers.gitPush,
+    runWizard: answers.runWizard,
+    submitToRegistry: answers.submitToRegistry
   };
 }
