@@ -1,4 +1,4 @@
-# create-bifrost
+# @a5gard/bifrost
 
 Platform-agnostic project creator with extensible template system inspired by Remix Stacks.
 
@@ -16,7 +16,7 @@ Platform-agnostic project creator with extensible template system inspired by Re
 ### Interactive Mode
 
 ```bash
-bunx create-bifrost
+bunx @a5gard/bifrost
 ```
 
 In interactive mode, the following prompts will display:
@@ -25,23 +25,102 @@ In interactive mode, the following prompts will display:
 - Which package manager do you prefer?
 - Would you like to have the install command run once the project has initialized?
 - Would you like to auto create and push the first commit to GitHub?
+- [!NEW] config.bifrost wizard
+- [!NEW] Submit template to bifrost registry
+
+## `config.bifrost wizard`
+
+```bash
+bunx @a5gard/bifrost wizard
+```
+
+The wizard will help guide you through the process of the templates config file by going over the following questions:
+- description
+- repo ( if it doesn't sense the data by scanning your project, it will prompt you to push your current project and create a public repo )
+- tags that you would like to associate with your template
+- post install scripts that are required to run once the project has initialized, providing the npm scripts names in a csv format
+- in a csv format, provide any and all plugins that you would like to include with your template to be installed and used with your template'
+
+It will then create config.bifrost for you with the submitted data, and if no values are missing will prompt you, asking if you would like to submit your template at this time. The only requirements for submitting is for the repo to be public and that your template includes the bifrost config file
+
+```json
+// config.bifrost
+{
+  "name": "My Stack",
+  "description": "A custom template for X platform",
+  "platform": "remix",
+  "github": "owner/repo",
+  "tags": ["react", "typescript", "tailwind"],
+  "postInstall": ["setup", "db:generate"],
+  "plugins": ["owner/plugin1", "owner/plugin2"]
+}
+```
+
+## `Submit template to bifrost registry`
+
+As long as your project already has a public repo already in place, if not it will prompt you to do so at this time, and the required `config.bifrost`. If you don't currently have the config file, it will start the config wizard to help you create it.
+
+```bash
+bunx @a5gard/bifrost submit
+```
+
+```json
+// dist/registry.bifrost
+[
+  {
+    "owner": "remix-run",
+    "repo": "indie-stack",
+    "description": "Remix Stack for indie developers",
+    "platform": "remix-run",
+    "tags": ["remix", "sqlite", "prisma"]
+  },
+  {
+    "owner": "remix-run",
+    "repo": "blues-stack",
+    "description": "Remix Stack with PostgreSQL",
+    "platform": "remix-run",
+    "tags": ["remix", "postgresql", "prisma"]
+  },
+  {
+    "owner": "remix-run",
+    "repo": "grunge-stack",
+    "description": "Remix Stack with AWS",
+    "platform": "remix-run",
+    "tags": ["remix", "aws", "dynamodb"]
+  },
+  {
+    "owner": "vercel",
+    "repo": "next.js",
+    "description": "Next.js starter",
+    "platform": "remix-run",
+    "tags": ["nextjs", "react", "vercel"]
+  },
+  {
+    "owner": "vitejs",
+    "repo": "vite",
+    "description": "Vite starter template",
+    "platform": "remix-run",
+    "tags": ["vite", "react"]
+  }
+]
+```
 
 ### With Options
 
 ```bash
-bunx create-bifrost my-app --template owner/repo --pkg-mgr bun
+bunx @a5gard/bifrost my-app --template owner/repo --pkg-mgr bun
 ```
 
 ### Full Example
 
 ```bash
-bunx create-bifrost my-app -s remix-run/indie-template -p bun
+bunx @a5gard/bifrost my-app -s remix-run/indie-template -p bun
 ```
 
 ### Platform Templates
 
 ```bash
-bunx create-bifrost my-app --list-templates
+bunx @a5gard/bifrost my-app --list-templates
 ```
 
 ## Options
@@ -59,7 +138,7 @@ bunx create-bifrost my-app --list-templates
 Any GitHub repository can be used as a template. To make this process easier whenenver you create a project based off of a platforms base installer, a config file will be created for you in order to create and post your own template. If you want to create your own template based off of another, the original templates config will already be located within the root folder. All you have to do is edit the config in order meet your newly created projects use case needs.
 
 ```bash
-bunx create-bifrost my-app --template name/repo
+bunx @a5gard/bifrost my-app --template name/repo
 ```
 
 ### Stack Configuration (Optional)
@@ -78,25 +157,75 @@ Add a `config.bifrost` to your repository root for enhanced functionality:
 }
 ```
 
+# @a5gard/bifrost-plugin
+
+Plugin installer / wizard for bifrost projects.
+
 ## Installing A Plugin
 
-Once your project has completed its installation process, you may now cd into the newly created directory and run
+### Interactive Mode
+
+Once your project has completed its installation process, you may now cd into the newly created directory and run:
 
 ```bash
-bunx bifrost-plugin
+bunx @a5gard/bifrost-plugin
 ```
 
-Entering interactive mode it will then obtain the list of available plugins to choose from the bifrost-plugin repo (owner `8an3`) from the file labeled `registry.bifrost`
+Entering interactive mode it will display the following options:
+- List available plugins to install
+- Plugin wizard ( guide in creating your own plugin )
+- Submit Plugin
+
+## `List available plugins to install` 
+
+Running the following command will start plugin installation process:
+
+```bash
+bunx @a5gard/bifrost-plugin list
+```
+
+The installer will then obtain the list of available plugins to choose from the @a5gard/bifrost-plugin repo (owner `8an3`) from the file labeled `registry.bifrost`
+
+### Direct Installation
 
 or you may use the supplied method 
 
 ```bash
-bunx bifrost-plugin otp-auth-plugin
+bunx @a5gard/bifrost-plugin otp-auth-plugin
 ```
 
 Which will immediatly start the installation process, after scanning your projects config.bifrost to see if the platforms match for compatibility to ensure you are installing the correct plugin.
 
-## Creating your own plugin
+## `Plugin wizard`
+### Creating your own plugin
+
+Running the following command will start the create plugin wizard:
+
+```bash
+bunx @a5gard/bifrost-plugin create
+```
+
+Where it will then inquirer:
+- name of plugin ( req )
+- platform ( req )
+- description ( req )
+- tags you would like to have associated with your plugin
+- will ask if you would like to supply the req. libraries now
+  - a placeholder will display the format to input the library names but will go as follows @remix-run/react, remix-auth, react
+- auto push / create github repo
+
+It will then create:
+- create `files/` folder
+- run `npm init`
+- push to github
+- create a readme containing a plugin guide and links to the site in order to submit your new plugin and discover others
+- create `plugin.bifrost` configuration file, filing in all the fields that it had gotten from you during the setup process
+  - name
+  - description
+  - platform
+  - tags, if you completed this step
+  - libraries, if you completed this step
+  - github
 
 Plugins are to be made with their own repo so as it can host all the required files for the plugin. 
 The repo is required to include a json config file labeled `plugin.bifrost` and a folder labeled `files` where it will host all the required files.
@@ -153,6 +282,17 @@ When installing a plugin it will prompt the user to either confirm the default s
     "configs":[]
 }
 ```
+
+## `Submit Plugin`
+
+Running the following command will start the submission process without the need of interactive mode:
+
+```bash
+bunx @a5gard/bifrost-plugin submit
+```
+
+Selecting this option will automate the submission process for you, adding your plugin to the libraries registry. Allowing you to share you plugin with others that will also be posted on the site to allow users to find it more easily. 
+
 
 ## Searching / Posting Templates and Plugins
 

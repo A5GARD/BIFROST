@@ -1,5 +1,5 @@
 {
-  "name": "create-bifrost",
+  "name": "@a5gard/bifrost",
   "version": "1.0.0",
   "description": "Platform-agnostic project creator with extensible template system",
   "type": "module",
