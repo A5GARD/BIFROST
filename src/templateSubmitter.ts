@@ -26,7 +26,7 @@ interface RegistryEntry {
 }
 
 const REGISTRY_REPO = 'A5GARD/BIFROST';
-const REGISTRY_FILE = 'dist/registry.bifrost';
+const REGISTRY_FILE = 'registry.bifrost';
 
 async function verifyPublicRepo(github: string): Promise<boolean> {
   try {

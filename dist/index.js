@@ -843,7 +843,7 @@ import chalk4 from "chalk";
 import prompts from "prompts";
 import { execSync as execSync3 } from "child_process";
 var REGISTRY_REPO = "A5GARD/BIFROST";
-var REGISTRY_FILE = "dist/registry.bifrost";
+var REGISTRY_FILE = "registry.bifrost";
 async function verifyPublicRepo(github) {
   try {
     const response = await fetch(`https://api.github.com/repos/${github}`);
