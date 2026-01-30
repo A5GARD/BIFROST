@@ -1,7 +1,7 @@
 import fs from 'fs-extra';
 import path from 'path';
 import os from 'os';
-import prompts from 'prompts';
+import inquirer from 'inquirer';
 import chalk from 'chalk';
 import ora from 'ora';
 import { execa } from 'execa';
@@ -55,22 +55,24 @@ export async function promptForFileLocation(
   fileName: string,
   suggestedLocation: string
 ): Promise<string> {
-  const response = await prompts({
-    type: 'text',
-    name: 'location',
-    message: `Location for ${chalk.cyan(fileName)}:`,
-    initial: suggestedLocation,
-    validate: (value: string) => {
-      if (!value) return 'Location is required';
-      return true;
+  const { location } = await inquirer.prompt([
+    {
+      type: 'input',
+      name: 'location',
+      message: `Location for ${chalk.cyan(fileName)}:`,
+      default: suggestedLocation,
+      validate: (value: string) => {
+        if (!value) return 'Location is required';
+        return true;
+      }
     }
-  });
+  ]);
   
-  if (!response.location) {
+  if (!location) {
     throw new Error('Operation cancelled');
   }
   
-  return response.location;
+  return location;
 }
 
 export async function copyPluginFiles(

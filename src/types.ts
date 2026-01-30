@@ -39,6 +39,10 @@ export interface CLIOptions {
 export interface ProjectContext {
   projectName: string;
   template: string;
+  tailwindBase: boolean;
+  tailwindNgin: boolean;
+  midgardr: boolean;
+  baldr: boolean;
   packageManager: PackageManager;
   install: boolean;
   gitPush: boolean;

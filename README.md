@@ -1,6 +1,18 @@
-# @a5gard/bifrost
+# bifrost
 
 Platform-agnostic project creator with extensible template system inspired by Remix Stacks.
+
+- [USAGE](#usage)
+- [INTERACTIVE MODE](#interactive-mode)
+- [CREATING A NEW PROJECT](#creating-a-new-project)
+- [CONFIG.BIFROST WIZARD](#config.bifrost-wizard)
+- [SUBMIT TEMPLATE](#submit-template)
+- [BIFROST-PLUGIN](#bifrost-plugin)
+- [INSTALLING A PLUGIN](#installing-a-plugin)
+- [LIST AVAILABLE PLUGINS TO INSTALL](#list-available-plugins-to-install)
+- [PLUGIN WIZARD](#plugin-wizard)
+- [SUBMIT PLUGIN](#submit-plugin)
+
 
 ## Features
 
@@ -11,6 +23,8 @@ Platform-agnostic project creator with extensible template system inspired by Re
 - ⚡ **Fast Setup**: Clone, configure, and install in seconds
 - 🔄 **Auto Git Push**: Optionally push initial commit to GitHub
 
+ 
+
 ## Usage
 
 ### Interactive Mode
@@ -20,44 +34,31 @@ bunx @a5gard/bifrost
 ```
 
 In interactive mode, the following prompts will display:
+- Create a new project
+- `config.bifrost` wizard
+- Submit template to bifrost registry
+
+### `Create a new project`
+Once you start to the `create a new project process` the follow prompts will guide you:
+
 - What would you like to name your new project?
-- Which platform would you like to use?
-- Which package manager do you prefer?
-- Would you like to have the install command run once the project has initialized?
-- Would you like to auto create and push the first commit to GitHub?
-- [!NEW] `config.bifrost` wizard
-- [!NEW] Submit template to bifrost registry
+- Which platform would you like to use? <!-- show the list of platforms, `PLATFORMS` -->
+- Do you prefer to use the platforms default install or would you like to opt for a template instead? <!-- show a list displaying two values one for each --> 
+  - if templates was chosen, you will be presented with a list of templates relevant to the desired platform 
+  - unless the platform has more than one default install, for example remix offers several default starters to choose from at this time that list will be presented for you to choose from
+- Which package manager do you prefer?<!-- display a list of pkg mgrs -->
+- The remaining questions will be displayed via a toggle item list
+  - Would you like tailwind and its requirements to be installed and configured:
+    - using the base tailwind config?
+    - using the preset ngin?
+  - Pre-install MIÐGARÐR UI components?
+  - Pre-install @a5gard/baldr icons?
+  - Would you like to auto install the projects libraries once the project has initialized?
+  - Would you like to auto create and push the first commit to GitHub?
 
 
-### With Options
 
-```bash
-bunx @a5gard/bifrost my-app --template owner/repo --pkg-mgr bun
-```
-
-### Full Example
-
-```bash
-bunx @a5gard/bifrost my-app -s remix-run/indie-template -p bun
-```
-
-### Platform Templates
-
-```bash
-bunx @a5gard/bifrost my-app --list-templates
-```
-
-## Options
-
-| Flag | Alias | Description |
-|------|-------|-------------|
-| `--template` | `-s` | Stack to use (format: owner/repo) |
-| `--pkg-mgr` | `-p` | Package manager (npm, pnpm, yarn, bun) |
-| `--no-install` | | Skip dependency installation |
-| `--help` | `-h` | Show help |
-| `--version` | `-V` | Show version |
-
-## `config.bifrost wizard`
+### `config.bifrost wizard`
 
 ```bash
 bunx @a5gard/bifrost wizard
@@ -85,12 +86,33 @@ It will then create config.bifrost for you with the submitted data, and if no va
 }
 ```
 
-## `Submit template to bifrost registry`
+### `Submit template`
 
 As long as your project already has a public repo already in place, if not it will prompt you to do so at this time, and the required `config.bifrost`. If you don't currently have the config file, it will start the config wizard to help you create it.
 
 ```bash
 bunx @a5gard/bifrost submit
+```
+
+
+
+### Command Flags
+
+| Flag | Alias | Description |
+|------|-------|-------------|
+| `--template` | `-s` | Stack to use (format: owner/repo) |
+| `--pkg-mgr` | `-p` | Package manager (npm, pnpm, yarn, bun) |
+| `--no-install` | | Skip dependency installation |
+| `--help` | `-h` | Show help |
+| `--version` | `-V` | Show version |
+| `--list-templates` |  | List available templates listed within the registry, supplying a platform with the flag will filter the results only listing templates relevant to the desired platform |
+| `--wizard` |  | Starts the config wizard |
+| `--submit` |  | Submit your template to be saved in the registry |
+
+```bash
+bunx @a5gard/bifrost my-app --template owner/repo --pkg-mgr bun
+bunx @a5gard/bifrost my-app -s remix-run/indie-template -p bun
+bunx @a5gard/bifrost my-app --list-templates
 ```
 
 
@@ -110,11 +132,33 @@ Add a `config.bifrost` to your repository root for enhanced functionality:
 }
 ```
 
-# @a5gard/bifrost-plugin
+
+> [!IMPORTANT]
+> ## Built to Last
+> 
+> This resource has been architected with obsolescence by design—a self-sustaining ecosystem using a decentralized package system built entirely on free infrastructure.
+> 
+> **What this means for you:**
+> 
+> You don't have to worry about the library going down, shutting down, or experiencing service interruptions due to funding issues, infrastructure failures, or anything happening to me personally.
+> 
+> Since there are no operational costs:
+> - If my finances collapse, your projects keep running
+> - If I get hit by a bus tomorrow, you won't even notice
+> - If I abandon the project entirely, everything continues working
+> 
+> Even if this entire project disappeared today, you'd still have:
+> - All your templates and plugins (in your repos)
+> - The ability to clone and use any community template (via GitHub)
+> - Complete ownership of everything you've created
+> 
+> True decentralization means no single point of failure—including me.
+
+
+# bifrost-plugin
 
 Plugin installer / wizard for bifrost projects.
 
-## Installing A Plugin
 
 ### Interactive Mode
 
@@ -129,7 +173,9 @@ Entering interactive mode it will display the following options:
 - Plugin wizard ( guide in creating your own plugin )
 - Submit Plugin
 
-## `List available plugins to install` 
+## Installing A Plugin
+
+### `List available plugins to install` 
 
 Running the following command will start plugin installation process:
 

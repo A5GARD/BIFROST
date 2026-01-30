@@ -4,12 +4,16 @@
   "description": "Platform-agnostic project creator with extensible template system",
   "type": "module",
   "bin": {
-    "create-bifrost": "./dist/index.js"
+    "@a5gard/bifrost": "./dist/index.js",
+    "bifrost": "./dist/index.js"
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "copy-registry": "bun copy-registry.js",
     "build:tsup": "tsup src/index.ts --format esm --dts --clean",
-    "build": "npm run copy-registry && npm run build:tsup",
+    "build": "npm run build:tsup && npm run copy-registry ",
     "dev": "tsc --watch",
     "prepublishOnly": "npm run build"
   },
@@ -31,6 +35,7 @@
     "commander": "^11.1.0",
     "execa": "^8.0.1",
     "fs-extra": "^11.2.0",
+    "inquirer": "^13.2.2",
     "ora": "^8.0.1",
     "prompts": "^2.4.2",
     "validate-npm-package-name": "^5.0.0"
@@ -41,8 +46,8 @@
     "@types/node": "^20.11.0",
     "@types/prompts": "^2.4.9",
     "@types/validate-npm-package-name": "^4.0.2",
-    "typescript": "^5.3.3",
-    "tsup": "^8.0.1"
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.3"
   },
   "engines": {
     "node": ">=18.0.0"

@@ -2,15 +2,106 @@ import fs from 'fs-extra';
 import path from 'path';
 import chalk from 'chalk';
 import ora from 'ora';
-import type { ProjectContext } from './types'; 
-import { cloneRepository, initializeGitRepo, pushToGitHub } from './git'; 
+import type { ProjectContext } from './types';
+import { cloneRepository, initializeGitRepo, pushToGitHub } from './git';
 import { installDependencies, runPostInstallScripts } from './install';
 import { installPlugins } from './plugin';
 import { parseStackReference, directoryExists, isDirectoryEmpty, detectPlatformFromStack, detectTagsFromStack } from './utilts';
 import { updatePackageJson, readStackConfig, createBifrostConfig } from './packge-json';
+import { execSync } from 'child_process';
+
+async function installTailwind(absolutePath: string, packageManager: string, useNgin: boolean): Promise<void> {
+  const spinner = ora(`Installing Tailwind CSS with ${useNgin ? 'preset ngin' : 'base config'}...`).start();
+
+  try {
+    const installCmd = packageManager === 'npm'
+      ? 'npm install -D tailwindcss postcss autoprefixer'
+      : `${packageManager} add -D tailwindcss postcss autoprefixer`;
+
+    execSync(installCmd, { cwd: absolutePath, stdio: 'ignore' });
+
+    execSync('npx tailwindcss init -p', { cwd: absolutePath, stdio: 'ignore' });
+
+    if (useNgin) {
+      const tailwindConfig = `import type { Config } from 'tailwindcss';
+import ngin from '@a5gard/ngin';
+
+export default {
+  presets: [ngin],
+  content: ['./app/**/*.{js,jsx,ts,tsx}'],
+} satisfies Config;`;
+
+      await fs.writeFile(path.join(absolutePath, 'tailwind.config.ts'), tailwindConfig);
+    }
+
+    const appCssPath = path.join(absolutePath, 'app', 'tailwind.css');
+    const rootCssPath = path.join(absolutePath, 'app', 'root.css');
+    const cssPath = await fs.pathExists(appCssPath) ? appCssPath : rootCssPath;
+
+    const tailwindDirectives = `@tailwind base;
+@tailwind components;
+@tailwind utilities;
+`;
+
+    if (await fs.pathExists(cssPath)) {
+      const existingCss = await fs.readFile(cssPath, 'utf-8');
+      if (!existingCss.includes('@tailwind')) {
+        await fs.writeFile(cssPath, tailwindDirectives + existingCss);
+      }
+    } else {
+      await fs.ensureDir(path.dirname(cssPath));
+      await fs.writeFile(cssPath, tailwindDirectives);
+    }
+
+    spinner.succeed(`Installed Tailwind CSS with ${useNgin ? 'preset ngin' : 'base config'}`);
+  } catch (error) {
+    spinner.fail('Failed to install Tailwind CSS');
+    throw error;
+  }
+}
+
+async function installMidgardr(absolutePath: string, packageManager: string, withNgin: boolean): Promise<void> {
+  const spinner = ora('Installing MIÐGARÐR UI components...').start();
+
+  try {
+    const command = withNgin ? 'full-w-ngin' : 'full-install';
+    execSync(`bunx @a5gard/midgardr ${command}`, { cwd: absolutePath, stdio: 'inherit' });
+    spinner.succeed('Installed MIÐGARÐR UI components');
+  } catch (error) {
+    spinner.fail('Failed to install MIÐGARÐR UI components');
+    throw error;
+  }
+}
+
+async function installBaldr(absolutePath: string, packageManager: string): Promise<void> {
+  const spinner = ora('Installing @a5gard/baldr icons...').start();
+
+  try {
+    const installCmd = packageManager === 'npm'
+      ? 'npm install @a5gard/baldr'
+      : `${packageManager} add @a5gard/baldr`;
+
+    execSync(installCmd, { cwd: absolutePath, stdio: 'ignore' });
+    spinner.succeed('Installed @a5gard/baldr icons');
+  } catch (error) {
+    spinner.fail('Failed to install @a5gard/baldr icons');
+    throw error;
+  }
+}
 
 export async function createProject(context: ProjectContext): Promise<void> {
-  const { projectName, template, packageManager, install, gitPush } = context;
+  const {
+    projectName,
+    template,
+    packageManager,
+    install,
+    gitPush,
+    tailwindBase,
+    tailwindNgin,
+    midgardr,
+    baldr
+  } = context;
+
   const absolutePath = path.resolve(projectName);
 
   console.log();
@@ -27,7 +118,7 @@ export async function createProject(context: ProjectContext): Promise<void> {
   }
 
   const { owner, repo } = parseStackReference(template);
-  
+
   const cloneSpinner = ora(`Cloning ${chalk.cyan(template)}...`).start();
   try {
     await cloneRepository(owner, repo, absolutePath);
@@ -56,6 +147,22 @@ export async function createProject(context: ProjectContext): Promise<void> {
     } catch (error) {
       installSpinner.fail('Failed to install dependencies');
       throw error;
+    }
+
+    if (midgardr) {
+      await installMidgardr(absolutePath, packageManager, tailwindNgin || false);
+    } else {
+      if (tailwindBase) {
+        await installTailwind(absolutePath, packageManager, false);
+      }
+
+      if (tailwindNgin) {
+        await installTailwind(absolutePath, packageManager, true);
+      }
+    }
+
+    if (baldr) {
+      await installBaldr(absolutePath, packageManager);
     }
 
     if (stackConfig?.postInstall && Array.isArray(stackConfig.postInstall)) {
@@ -108,14 +215,18 @@ export async function createProject(context: ProjectContext): Promise<void> {
   console.log();
   console.log(chalk.bold.green('✓ Project created successfully!'));
   console.log();
-  console.log(chalk.bold('Next steps:'));
   console.log();
-  console.log(`  ${chalk.cyan('cd')} ${projectName}`);
-  
+
   if (!install) {
+    console.log(chalk.bold('Next steps:'));
+    console.log(`  ${chalk.cyan('cd')} ${projectName}`);
     console.log(`  ${chalk.cyan(`${packageManager} install`)}`);
+    console.log(`  ${chalk.cyan(`${packageManager} ${packageManager === 'npm' ? 'run ' : ''}dev`)}`);
+  } else {
+    console.log(chalk.bold.green('changing directories and starting the first dev server...'));
+    execSync(`cd ${projectName}`, { cwd: absolutePath, stdio: 'inherit' });
+    execSync(`${packageManager} ${packageManager === 'npm' ? 'run ' : ''}dev`, { cwd: absolutePath, stdio: 'inherit' });
   }
-  
-  console.log(`  ${chalk.cyan(`${packageManager} ${packageManager === 'npm' ? 'run ' : ''}dev`)}`);
+
   console.log();
 }

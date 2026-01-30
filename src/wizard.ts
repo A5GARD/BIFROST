@@ -1,9 +1,7 @@
-// src/wizard.ts
-
 import fs from 'fs-extra';
 import path from 'path';
 import chalk from 'chalk';
-import prompts from 'prompts';
+import inquirer from 'inquirer';
 import { execSync } from 'child_process';
 
 interface ConfigBifrost {
@@ -14,6 +12,26 @@ interface ConfigBifrost {
   tags: string[];
   postInstall: string[];
   plugins: string[];
+}
+
+function drawBox(title: string, content: string[], footer?: string): void {
+  const width = 117;
+  const horizontalLine = '─'.repeat(width - 2);
+  
+  console.log(`╭${horizontalLine}╮`);
+  console.log(`│${title.padStart(Math.floor((width - 2 + title.length) / 2)).padEnd(width - 2)}│`);
+  console.log(`├${horizontalLine}┤`);
+  
+  content.forEach(line => {
+    console.log(`│ ${line.padEnd(width - 4)} │`);
+  });
+  
+  if (footer) {
+    console.log(`├${horizontalLine}┤`);
+    console.log(`│${footer.padStart(Math.floor((width - 2 + footer.length) / 2)).padEnd(width - 2)}│`);
+  }
+  
+  console.log(`╰${horizontalLine}╯`);
 }
 
 async function detectGitHubRepo(): Promise<string | null> {
@@ -45,30 +63,40 @@ async function detectGitHubRepo(): Promise<string | null> {
 }
 
 async function promptForGitHubRepo(): Promise<string> {
-  console.log(chalk.yellow('\n⚠ No GitHub repository detected'));
-  console.log(chalk.gray('Please push your project and create a public repository\n'));
+  drawBox(
+    'GITHUB REPOSITORY REQUIRED',
+    [
+      chalk.yellow('⚠ No GitHub repository detected'),
+      '',
+      'Please push your project and create a public repository before continuing.',
+    ]
+  );
   
-  const { hasRepo } = await prompts({
-    type: 'confirm',
-    name: 'hasRepo',
-    message: 'Have you created a public GitHub repository?',
-    initial: false
-  });
+  const { hasRepo } = await inquirer.prompt([
+    {
+      type: 'confirm',
+      name: 'hasRepo',
+      message: 'Have you created a public GitHub repository?',
+      default: false
+    }
+  ]);
   
   if (!hasRepo) {
     console.log(chalk.red('\nPlease create a public GitHub repository first'));
     process.exit(1);
   }
   
-  const { repo } = await prompts({
-    type: 'text',
-    name: 'repo',
-    message: 'Enter your GitHub repository (owner/repo):',
-    validate: (value) => {
-      const pattern = /^[\w-]+\/[\w-]+$/;
-      return pattern.test(value) || 'Invalid format. Use: owner/repo';
+  const { repo } = await inquirer.prompt([
+    {
+      type: 'input',
+      name: 'repo',
+      message: 'Enter your GitHub repository (owner/repo):',
+      validate: (value: string) => {
+        const pattern = /^[\w-]+\/[\w-]+$/;
+        return pattern.test(value) || 'Invalid format. Use: owner/repo';
+      }
     }
-  });
+  ]);
   
   if (!repo) {
     console.log(chalk.red('\nRepository is required'));
@@ -79,17 +107,26 @@ async function promptForGitHubRepo(): Promise<string> {
 }
 
 export async function runConfigWizard(): Promise<ConfigBifrost> {
-  console.log(chalk.blue.bold('\n🧙 Config.bifrost Wizard\n'));
+  drawBox(
+    'CONFIG.BIFROST WIZARD',
+    [
+      'This wizard will guide you through creating a config.bifrost file for your template.',
+      '',
+      'This configuration enables your template to be shared with the community.',
+    ]
+  );
   
   const configPath = path.join(process.cwd(), 'config.bifrost');
   
   if (await fs.pathExists(configPath)) {
-    const { overwrite } = await prompts({
-      type: 'confirm',
-      name: 'overwrite',
-      message: 'config.bifrost already exists. Overwrite?',
-      initial: false
-    });
+    const { overwrite } = await inquirer.prompt([
+      {
+        type: 'confirm',
+        name: 'overwrite',
+        message: 'config.bifrost already exists. Overwrite?',
+        default: false
+      }
+    ]);
     
     if (!overwrite) {
       const existingConfig = await fs.readJson(configPath);
@@ -99,53 +136,62 @@ export async function runConfigWizard(): Promise<ConfigBifrost> {
   
   const detectedRepo = await detectGitHubRepo();
   
-  const responses = await prompts([
+  drawBox(
+    'TEMPLATE INFORMATION',
+    [
+      'Provide basic information about your template.',
+      '',
+      'This helps users discover and understand your template.',
+    ]
+  );
+  
+  const responses = await inquirer.prompt([
     {
-      type: 'text',
+      type: 'input',
       name: 'name',
       message: 'Template name:',
-      validate: (value) => value.trim().length > 0 || 'Name is required'
+      validate: (value: string) => value.trim().length > 0 || 'Name is required'
     },
     {
-      type: 'text',
+      type: 'input',
       name: 'description',
       message: 'Description:',
-      validate: (value) => value.trim().length > 0 || 'Description is required'
+      validate: (value: string) => value.trim().length > 0 || 'Description is required'
     },
     {
-      type: 'text',
+      type: 'input',
       name: 'platform',
       message: 'Platform:',
-      initial: 'remix',
-      validate: (value) => value.trim().length > 0 || 'Platform is required'
+      default: 'remix',
+      validate: (value: string) => value.trim().length > 0 || 'Platform is required'
     },
     {
-      type: 'text',
+      type: 'input',
       name: 'github',
       message: 'GitHub repository (owner/repo):',
-      initial: detectedRepo || '',
-      validate: (value) => {
+      default: detectedRepo || '',
+      validate: (value: string) => {
         const pattern = /^[\w-]+\/[\w-]+$/;
         return pattern.test(value) || 'Invalid format. Use: owner/repo';
       }
     },
     {
-      type: 'text',
+      type: 'input',
       name: 'tags',
       message: 'Tags (comma-separated):',
-      validate: (value) => value.trim().length > 0 || 'At least one tag is required'
+      validate: (value: string) => value.trim().length > 0 || 'At least one tag is required'
     },
     {
-      type: 'text',
+      type: 'input',
       name: 'postInstall',
       message: 'Post-install scripts (comma-separated npm script names):',
-      initial: ''
+      default: ''
     },
     {
-      type: 'text',
+      type: 'input',
       name: 'plugins',
       message: 'Plugins to include (comma-separated owner/repo):',
-      initial: ''
+      default: ''
     }
   ]);
   
@@ -170,11 +216,16 @@ export async function runConfigWizard(): Promise<ConfigBifrost> {
   
   await fs.writeJson(configPath, config, { spaces: 2 });
   
-  console.log(chalk.green('\n✅ config.bifrost created successfully!\n'));
-  console.log(chalk.cyan('Configuration:'));
-  console.log(chalk.gray('─'.repeat(50)));
-  console.log(chalk.white(JSON.stringify(config, null, 2)));
-  console.log(chalk.gray('─'.repeat(50)));
+  drawBox(
+    'SUCCESS',
+    [
+      chalk.green('✅ config.bifrost created successfully!'),
+      '',
+      'Configuration:',
+      '',
+      ...JSON.stringify(config, null, 2).split('\n').map(line => chalk.white(line)),
+    ]
+  );
   
   return config;
 }

@@ -1,7 +1,5 @@
-#!/usr/bin/env bun
-
-// src/cli.ts
-import { Command } from "commander";
+// src/index.ts
+import inquirer3 from "inquirer";
 import chalk5 from "chalk";
 
 // src/constants.ts
@@ -125,211 +123,6 @@ var PLATFORMS = {
 var PACKAGE_MANAGERS = ["npm", "pnpm", "yarn", "bun"];
 var TEMP_DIR_PREFIX = "bifrost-temp-";
 
-// src/prompts.ts
-import prompts from "prompts";
-
-// src/utilts.ts
-import fs from "fs-extra";
-import validateNpmPackageName from "validate-npm-package-name";
-function toValidPackageName(name) {
-  return name.trim().toLowerCase().replace(/\s+/g, "-").replace(/^[._]/, "").replace(/[^a-z0-9-~]+/g, "-");
-}
-function parseStackReference(template) {
-  const parts = template.split("/");
-  if (parts.length !== 2) {
-    throw new Error("Stack must be in format: owner/repo");
-  }
-  return { owner: parts[0], repo: parts[1] };
-}
-async function directoryExists(dir) {
-  try {
-    const stats = await fs.stat(dir);
-    return stats.isDirectory();
-  } catch {
-    return false;
-  }
-}
-async function isDirectoryEmpty(dir) {
-  const files = await fs.readdir(dir);
-  return files.length === 0;
-}
-function getPackageManagerCommand(pm, command) {
-  const commands = {
-    npm: { install: "npm install", run: "npm run" },
-    pnpm: { install: "pnpm install", run: "pnpm" },
-    yarn: { install: "yarn", run: "yarn" },
-    bun: { install: "bun install", run: "bun" }
-  };
-  return commands[pm][command];
-}
-async function detectPackageManager() {
-  const userAgent = process.env.npm_config_user_agent;
-  if (!userAgent) return "bun";
-  if (userAgent.startsWith("pnpm")) return "pnpm";
-  if (userAgent.startsWith("yarn")) return "yarn";
-  if (userAgent.startsWith("bun")) return "bun";
-  if (userAgent.startsWith("npm")) return "npm";
-  return "bun";
-}
-function detectPlatformFromStack(template) {
-  const lowerStack = template.toLowerCase();
-  if (lowerStack.includes("remix")) return "remix";
-  if (lowerStack.includes("next")) return "nextjs";
-  if (lowerStack.includes("vite")) return "vite";
-  if (lowerStack.includes("vue")) return "vue";
-  if (lowerStack.includes("svelte")) return "svelte";
-  if (lowerStack.includes("astro")) return "astro";
-  if (lowerStack.includes("solid")) return "solid";
-  if (lowerStack.includes("qwik")) return "qwik";
-  if (lowerStack.includes("react") || lowerStack.includes("cra")) return "react";
-  return void 0;
-}
-function detectTagsFromStack(template) {
-  const tags = [];
-  const lowerStack = template.toLowerCase();
-  if (lowerStack.includes("typescript") || lowerStack.includes("-ts")) tags.push("typescript");
-  if (lowerStack.includes("javascript") || lowerStack.includes("-js")) tags.push("javascript");
-  if (lowerStack.includes("tailwind")) tags.push("tailwind");
-  if (lowerStack.includes("prisma")) tags.push("prisma");
-  if (lowerStack.includes("postgres")) tags.push("postgresql");
-  if (lowerStack.includes("sqlite")) tags.push("sqlite");
-  if (lowerStack.includes("mongo")) tags.push("mongodb");
-  if (lowerStack.includes("aws")) tags.push("aws");
-  if (lowerStack.includes("cloudflare")) tags.push("cloudflare");
-  if (lowerStack.includes("vercel")) tags.push("vercel");
-  if (lowerStack.includes("react")) tags.push("react");
-  return tags;
-}
-
-// src/prompts.ts
-async function promptForMissingOptions(projectName, template, packageManager, install) {
-  const detectedPM = await detectPackageManager();
-  const questions = [];
-  if (!projectName) {
-    questions.push({
-      type: "text",
-      name: "projectName",
-      message: "What would you like to name your new project?",
-      initial: "my-bifrost-app",
-      validate: (value) => {
-        if (!value) return "Project name is required";
-        return true;
-      }
-    });
-  }
-  if (!template) {
-    questions.push({
-      type: "select",
-      name: "platform",
-      message: "Which platform would you like to use?",
-      choices: Object.entries(PLATFORMS).map(([key, platform]) => ({
-        title: platform.name,
-        value: key,
-        description: platform.description || ""
-      })),
-      initial: 0
-    });
-    questions.push({
-      type: (prev) => {
-        const platform = PLATFORMS[prev];
-        return platform.templates ? "select" : null;
-      },
-      name: "template",
-      message: "Select a template:",
-      choices: (prev) => {
-        const platform = PLATFORMS[prev];
-        if (!platform.templates) return [];
-        return Object.entries(platform.templates).map(([key, template2]) => ({
-          title: template2.name,
-          value: template2.repo,
-          description: template2.description
-        }));
-      }
-    });
-    questions.push({
-      type: (prev, values) => {
-        const platformKey = values.platform;
-        return platformKey === "custom" ? "text" : null;
-      },
-      name: "customStack",
-      message: "Enter template (owner/repo):",
-      validate: (value) => {
-        if (!value || !value.includes("/")) {
-          return "Stack must be in format: owner/repo";
-        }
-        return true;
-      }
-    });
-  }
-  if (!packageManager) {
-    questions.push({
-      type: "select",
-      name: "packageManager",
-      message: "Which package manager do you prefer?",
-      choices: PACKAGE_MANAGERS.map((pm) => ({
-        title: pm,
-        value: pm,
-        selected: pm === detectedPM
-      })),
-      initial: PACKAGE_MANAGERS.indexOf(detectedPM)
-    });
-  }
-  if (install === void 0) {
-    questions.push({
-      type: "confirm",
-      name: "install",
-      message: "Would you like to have the install command run once the project has initialized?",
-      initial: true
-    });
-  }
-  questions.push({
-    type: "confirm",
-    name: "gitPush",
-    message: "Would you like to auto create and push the first commit to GitHub?",
-    initial: false
-  });
-  questions.push({
-    type: "confirm",
-    name: "runWizard",
-    message: "Would you like to run the config.bifrost wizard?",
-    initial: false
-  });
-  questions.push({
-    type: "confirm",
-    name: "submitToRegistry",
-    message: "Would you like to submit your template to the bifrost registry?",
-    initial: false
-  });
-  const answers = await prompts(questions, {
-    onCancel: () => {
-      console.log("\nOperation cancelled");
-      process.exit(0);
-    }
-  });
-  let finalStack = template;
-  if (!template) {
-    if (answers.platform === "custom") {
-      finalStack = answers.customStack;
-    } else if (answers.template) {
-      finalStack = answers.template;
-    } else {
-      const platform = PLATFORMS[answers.platform];
-      if (platform.repo) {
-        finalStack = platform.repo;
-      }
-    }
-  }
-  return {
-    projectName: projectName || answers.projectName,
-    template: finalStack,
-    packageManager: packageManager || answers.packageManager,
-    install: install !== void 0 ? install : answers.install,
-    gitPush: answers.gitPush,
-    runWizard: answers.runWizard,
-    submitToRegistry: answers.submitToRegistry
-  };
-}
-
 // src/creator.ts
 import fs5 from "fs-extra";
 import path4 from "path";
@@ -338,7 +131,7 @@ import ora2 from "ora";
 
 // src/git.ts
 import { execa } from "execa";
-import fs2 from "fs-extra";
+import fs from "fs-extra";
 import path from "path";
 import os from "os";
 async function isGitInstalled() {
@@ -358,11 +151,11 @@ async function cloneRepository(owner, repo, targetDir) {
   const tempDir = path.join(os.tmpdir(), `${TEMP_DIR_PREFIX}${Date.now()}`);
   try {
     await execa("git", ["clone", "--depth", "1", repoUrl, tempDir]);
-    await fs2.remove(path.join(tempDir, ".git"));
-    await fs2.copy(tempDir, targetDir, { overwrite: true });
-    await fs2.remove(tempDir);
+    await fs.remove(path.join(tempDir, ".git"));
+    await fs.copy(tempDir, targetDir, { overwrite: true });
+    await fs.remove(tempDir);
   } catch (error) {
-    await fs2.remove(tempDir).catch(() => {
+    await fs.remove(tempDir).catch(() => {
     });
     if (error instanceof Error) {
       if (error.message.includes("not found") || error.message.includes("not exist")) {
@@ -402,6 +195,72 @@ async function pushToGitHub(projectDir) {
 
 // src/install.ts
 import { execa as execa2 } from "execa";
+
+// src/utilts.ts
+import fs2 from "fs-extra";
+import validateNpmPackageName from "validate-npm-package-name";
+function toValidPackageName(name) {
+  return name.trim().toLowerCase().replace(/\s+/g, "-").replace(/^[._]/, "").replace(/[^a-z0-9-~]+/g, "-");
+}
+function parseStackReference(template) {
+  const parts = template.split("/");
+  if (parts.length !== 2) {
+    throw new Error("Stack must be in format: owner/repo");
+  }
+  return { owner: parts[0], repo: parts[1] };
+}
+async function directoryExists(dir) {
+  try {
+    const stats = await fs2.stat(dir);
+    return stats.isDirectory();
+  } catch {
+    return false;
+  }
+}
+async function isDirectoryEmpty(dir) {
+  const files = await fs2.readdir(dir);
+  return files.length === 0;
+}
+function getPackageManagerCommand(pm, command) {
+  const commands = {
+    npm: { install: "npm install", run: "npm run" },
+    pnpm: { install: "pnpm install", run: "pnpm" },
+    yarn: { install: "yarn", run: "yarn" },
+    bun: { install: "bun install", run: "bun" }
+  };
+  return commands[pm][command];
+}
+function detectPlatformFromStack(template) {
+  const lowerStack = template.toLowerCase();
+  if (lowerStack.includes("remix")) return "remix";
+  if (lowerStack.includes("next")) return "nextjs";
+  if (lowerStack.includes("vite")) return "vite";
+  if (lowerStack.includes("vue")) return "vue";
+  if (lowerStack.includes("svelte")) return "svelte";
+  if (lowerStack.includes("astro")) return "astro";
+  if (lowerStack.includes("solid")) return "solid";
+  if (lowerStack.includes("qwik")) return "qwik";
+  if (lowerStack.includes("react") || lowerStack.includes("cra")) return "react";
+  return void 0;
+}
+function detectTagsFromStack(template) {
+  const tags = [];
+  const lowerStack = template.toLowerCase();
+  if (lowerStack.includes("typescript") || lowerStack.includes("-ts")) tags.push("typescript");
+  if (lowerStack.includes("javascript") || lowerStack.includes("-js")) tags.push("javascript");
+  if (lowerStack.includes("tailwind")) tags.push("tailwind");
+  if (lowerStack.includes("prisma")) tags.push("prisma");
+  if (lowerStack.includes("postgres")) tags.push("postgresql");
+  if (lowerStack.includes("sqlite")) tags.push("sqlite");
+  if (lowerStack.includes("mongo")) tags.push("mongodb");
+  if (lowerStack.includes("aws")) tags.push("aws");
+  if (lowerStack.includes("cloudflare")) tags.push("cloudflare");
+  if (lowerStack.includes("vercel")) tags.push("vercel");
+  if (lowerStack.includes("react")) tags.push("react");
+  return tags;
+}
+
+// src/install.ts
 async function installDependencies(projectDir, packageManager) {
   const installCommand = getPackageManagerCommand(packageManager, "install");
   const [cmd, ...args] = installCommand.split(" ");
@@ -430,7 +289,7 @@ async function runPostInstallScripts(projectDir, packageManager, scripts) {
 import fs3 from "fs-extra";
 import path2 from "path";
 import os2 from "os";
-import prompts2 from "prompts";
+import inquirer from "inquirer";
 import chalk from "chalk";
 import ora from "ora";
 import { execa as execa3 } from "execa";
@@ -462,20 +321,22 @@ async function installPluginLibraries(projectDir, packageManager, libraries) {
   });
 }
 async function promptForFileLocation(fileName, suggestedLocation) {
-  const response = await prompts2({
-    type: "text",
-    name: "location",
-    message: `Location for ${chalk.cyan(fileName)}:`,
-    initial: suggestedLocation,
-    validate: (value) => {
-      if (!value) return "Location is required";
-      return true;
+  const { location } = await inquirer.prompt([
+    {
+      type: "input",
+      name: "location",
+      message: `Location for ${chalk.cyan(fileName)}:`,
+      default: suggestedLocation,
+      validate: (value) => {
+        if (!value) return "Location is required";
+        return true;
+      }
     }
-  });
-  if (!response.location) {
+  ]);
+  if (!location) {
     throw new Error("Operation cancelled");
   }
-  return response.location;
+  return location;
 }
 async function copyPluginFiles(projectDir, pluginTempDir, files) {
   for (const file of files) {
@@ -595,8 +456,79 @@ async function createBifrostConfig(projectDir, projectName, template, platform, 
 }
 
 // src/creator.ts
+import { execSync } from "child_process";
+async function installTailwind(absolutePath, packageManager, useNgin) {
+  const spinner = ora2(`Installing Tailwind CSS with ${useNgin ? "preset ngin" : "base config"}...`).start();
+  try {
+    const installCmd = packageManager === "npm" ? "npm install -D tailwindcss postcss autoprefixer" : `${packageManager} add -D tailwindcss postcss autoprefixer`;
+    execSync(installCmd, { cwd: absolutePath, stdio: "ignore" });
+    execSync("npx tailwindcss init -p", { cwd: absolutePath, stdio: "ignore" });
+    if (useNgin) {
+      const tailwindConfig = `import type { Config } from 'tailwindcss';
+import ngin from '@a5gard/ngin';
+
+export default {
+  presets: [ngin],
+  content: ['./app/**/*.{js,jsx,ts,tsx}'],
+} satisfies Config;`;
+      await fs5.writeFile(path4.join(absolutePath, "tailwind.config.ts"), tailwindConfig);
+    }
+    const appCssPath = path4.join(absolutePath, "app", "tailwind.css");
+    const rootCssPath = path4.join(absolutePath, "app", "root.css");
+    const cssPath = await fs5.pathExists(appCssPath) ? appCssPath : rootCssPath;
+    const tailwindDirectives = `@tailwind base;
+@tailwind components;
+@tailwind utilities;
+`;
+    if (await fs5.pathExists(cssPath)) {
+      const existingCss = await fs5.readFile(cssPath, "utf-8");
+      if (!existingCss.includes("@tailwind")) {
+        await fs5.writeFile(cssPath, tailwindDirectives + existingCss);
+      }
+    } else {
+      await fs5.ensureDir(path4.dirname(cssPath));
+      await fs5.writeFile(cssPath, tailwindDirectives);
+    }
+    spinner.succeed(`Installed Tailwind CSS with ${useNgin ? "preset ngin" : "base config"}`);
+  } catch (error) {
+    spinner.fail("Failed to install Tailwind CSS");
+    throw error;
+  }
+}
+async function installMidgardr(absolutePath, packageManager, withNgin) {
+  const spinner = ora2("Installing MI\xD0GAR\xD0R UI components...").start();
+  try {
+    const command = withNgin ? "full-w-ngin" : "full-install";
+    execSync(`bunx @a5gard/midgardr ${command}`, { cwd: absolutePath, stdio: "inherit" });
+    spinner.succeed("Installed MI\xD0GAR\xD0R UI components");
+  } catch (error) {
+    spinner.fail("Failed to install MI\xD0GAR\xD0R UI components");
+    throw error;
+  }
+}
+async function installBaldr(absolutePath, packageManager) {
+  const spinner = ora2("Installing @a5gard/baldr icons...").start();
+  try {
+    const installCmd = packageManager === "npm" ? "npm install @a5gard/baldr" : `${packageManager} add @a5gard/baldr`;
+    execSync(installCmd, { cwd: absolutePath, stdio: "ignore" });
+    spinner.succeed("Installed @a5gard/baldr icons");
+  } catch (error) {
+    spinner.fail("Failed to install @a5gard/baldr icons");
+    throw error;
+  }
+}
 async function createProject(context) {
-  const { projectName, template, packageManager, install, gitPush } = context;
+  const {
+    projectName,
+    template,
+    packageManager,
+    install,
+    gitPush,
+    tailwindBase,
+    tailwindNgin,
+    midgardr,
+    baldr
+  } = context;
   const absolutePath = path4.resolve(projectName);
   console.log();
   console.log(chalk2.bold("Creating your Bifrost project..."));
@@ -635,6 +567,19 @@ async function createProject(context) {
     } catch (error) {
       installSpinner.fail("Failed to install dependencies");
       throw error;
+    }
+    if (midgardr) {
+      await installMidgardr(absolutePath, packageManager, tailwindNgin || false);
+    } else {
+      if (tailwindBase) {
+        await installTailwind(absolutePath, packageManager, false);
+      }
+      if (tailwindNgin) {
+        await installTailwind(absolutePath, packageManager, true);
+      }
+    }
+    if (baldr) {
+      await installBaldr(absolutePath, packageManager);
     }
     if (stackConfig?.postInstall && Array.isArray(stackConfig.postInstall)) {
       const postInstallSpinner = ora2("Running post-install scripts...").start();
@@ -681,13 +626,17 @@ async function createProject(context) {
   console.log();
   console.log(chalk2.bold.green("\u2713 Project created successfully!"));
   console.log();
-  console.log(chalk2.bold("Next steps:"));
   console.log();
-  console.log(`  ${chalk2.cyan("cd")} ${projectName}`);
   if (!install) {
+    console.log(chalk2.bold("Next steps:"));
+    console.log(`  ${chalk2.cyan("cd")} ${projectName}`);
     console.log(`  ${chalk2.cyan(`${packageManager} install`)}`);
+    console.log(`  ${chalk2.cyan(`${packageManager} ${packageManager === "npm" ? "run " : ""}dev`)}`);
+  } else {
+    console.log(chalk2.bold.green("changing directories and starting the first dev server..."));
+    execSync(`cd ${projectName}`, { cwd: absolutePath, stdio: "inherit" });
+    execSync(`${packageManager} ${packageManager === "npm" ? "run " : ""}dev`, { cwd: absolutePath, stdio: "inherit" });
   }
-  console.log(`  ${chalk2.cyan(`${packageManager} ${packageManager === "npm" ? "run " : ""}dev`)}`);
   console.log();
 }
 
@@ -695,11 +644,26 @@ async function createProject(context) {
 import fs6 from "fs-extra";
 import path5 from "path";
 import chalk3 from "chalk";
-import prompts3 from "prompts";
-import { execSync } from "child_process";
+import inquirer2 from "inquirer";
+import { execSync as execSync2 } from "child_process";
+function drawBox(title, content, footer) {
+  const width = 117;
+  const horizontalLine = "\u2500".repeat(width - 2);
+  console.log(`\u256D${horizontalLine}\u256E`);
+  console.log(`\u2502${title.padStart(Math.floor((width - 2 + title.length) / 2)).padEnd(width - 2)}\u2502`);
+  console.log(`\u251C${horizontalLine}\u2524`);
+  content.forEach((line) => {
+    console.log(`\u2502 ${line.padEnd(width - 4)} \u2502`);
+  });
+  if (footer) {
+    console.log(`\u251C${horizontalLine}\u2524`);
+    console.log(`\u2502${footer.padStart(Math.floor((width - 2 + footer.length) / 2)).padEnd(width - 2)}\u2502`);
+  }
+  console.log(`\u2570${horizontalLine}\u256F`);
+}
 async function detectGitHubRepo() {
   try {
-    const remote = execSync("git config --get remote.origin.url", { encoding: "utf-8" }).trim();
+    const remote = execSync2("git config --get remote.origin.url", { encoding: "utf-8" }).trim();
     const match = remote.match(/github\.com[:/](.+?)(?:\.git)?$/);
     if (match) {
       return match[1];
@@ -723,27 +687,37 @@ async function detectGitHubRepo() {
   return null;
 }
 async function promptForGitHubRepo() {
-  console.log(chalk3.yellow("\n\u26A0 No GitHub repository detected"));
-  console.log(chalk3.gray("Please push your project and create a public repository\n"));
-  const { hasRepo } = await prompts3({
-    type: "confirm",
-    name: "hasRepo",
-    message: "Have you created a public GitHub repository?",
-    initial: false
-  });
+  drawBox(
+    "GITHUB REPOSITORY REQUIRED",
+    [
+      chalk3.yellow("\u26A0 No GitHub repository detected"),
+      "",
+      "Please push your project and create a public repository before continuing."
+    ]
+  );
+  const { hasRepo } = await inquirer2.prompt([
+    {
+      type: "confirm",
+      name: "hasRepo",
+      message: "Have you created a public GitHub repository?",
+      default: false
+    }
+  ]);
   if (!hasRepo) {
     console.log(chalk3.red("\nPlease create a public GitHub repository first"));
     process.exit(1);
   }
-  const { repo } = await prompts3({
-    type: "text",
-    name: "repo",
-    message: "Enter your GitHub repository (owner/repo):",
-    validate: (value) => {
-      const pattern = /^[\w-]+\/[\w-]+$/;
-      return pattern.test(value) || "Invalid format. Use: owner/repo";
+  const { repo } = await inquirer2.prompt([
+    {
+      type: "input",
+      name: "repo",
+      message: "Enter your GitHub repository (owner/repo):",
+      validate: (value) => {
+        const pattern = /^[\w-]+\/[\w-]+$/;
+        return pattern.test(value) || "Invalid format. Use: owner/repo";
+      }
     }
-  });
+  ]);
   if (!repo) {
     console.log(chalk3.red("\nRepository is required"));
     process.exit(1);
@@ -751,68 +725,85 @@ async function promptForGitHubRepo() {
   return repo;
 }
 async function runConfigWizard() {
-  console.log(chalk3.blue.bold("\n\u{1F9D9} Config.bifrost Wizard\n"));
+  drawBox(
+    "CONFIG.BIFROST WIZARD",
+    [
+      "This wizard will guide you through creating a config.bifrost file for your template.",
+      "",
+      "This configuration enables your template to be shared with the community."
+    ]
+  );
   const configPath = path5.join(process.cwd(), "config.bifrost");
   if (await fs6.pathExists(configPath)) {
-    const { overwrite } = await prompts3({
-      type: "confirm",
-      name: "overwrite",
-      message: "config.bifrost already exists. Overwrite?",
-      initial: false
-    });
+    const { overwrite } = await inquirer2.prompt([
+      {
+        type: "confirm",
+        name: "overwrite",
+        message: "config.bifrost already exists. Overwrite?",
+        default: false
+      }
+    ]);
     if (!overwrite) {
       const existingConfig = await fs6.readJson(configPath);
       return existingConfig;
     }
   }
   const detectedRepo = await detectGitHubRepo();
-  const responses = await prompts3([
+  drawBox(
+    "TEMPLATE INFORMATION",
+    [
+      "Provide basic information about your template.",
+      "",
+      "This helps users discover and understand your template."
+    ]
+  );
+  const responses = await inquirer2.prompt([
     {
-      type: "text",
+      type: "input",
       name: "name",
       message: "Template name:",
       validate: (value) => value.trim().length > 0 || "Name is required"
     },
     {
-      type: "text",
+      type: "input",
       name: "description",
       message: "Description:",
       validate: (value) => value.trim().length > 0 || "Description is required"
     },
     {
-      type: "text",
+      type: "input",
       name: "platform",
       message: "Platform:",
-      initial: "remix",
+      default: "remix",
       validate: (value) => value.trim().length > 0 || "Platform is required"
     },
     {
-      type: "text",
+      type: "input",
       name: "github",
       message: "GitHub repository (owner/repo):",
-      initial: detectedRepo || "",
+      default: detectedRepo || "",
       validate: (value) => {
         const pattern = /^[\w-]+\/[\w-]+$/;
         return pattern.test(value) || "Invalid format. Use: owner/repo";
       }
     },
     {
-      type: "text",
+      type: "input",
       name: "tags",
       message: "Tags (comma-separated):",
       validate: (value) => value.trim().length > 0 || "At least one tag is required"
     },
     {
-      type: "text",
+      type: "input",
       name: "postInstall",
       message: "Post-install scripts (comma-separated npm script names):",
-      initial: ""
+      default: ""
     },
     {
-      type: "text",
+      type: "input",
       name: "plugins",
       message: "Plugins to include (comma-separated owner/repo):",
-      initial: ""
+      default: ""
     }
   ]);
   if (!responses.name) {
@@ -832,11 +823,16 @@ async function runConfigWizard() {
     plugins: responses.plugins ? responses.plugins.split(",").map((p) => p.trim()).filter(Boolean) : []
   };
   await fs6.writeJson(configPath, config, { spaces: 2 });
-  console.log(chalk3.green("\n\u2705 config.bifrost created successfully!\n"));
-  console.log(chalk3.cyan("Configuration:"));
-  console.log(chalk3.gray("\u2500".repeat(50)));
-  console.log(chalk3.white(JSON.stringify(config, null, 2)));
-  console.log(chalk3.gray("\u2500".repeat(50)));
+  drawBox(
+    "SUCCESS",
+    [
+      chalk3.green("\u2705 config.bifrost created successfully!"),
+      "",
+      "Configuration:",
+      "",
+      ...JSON.stringify(config, null, 2).split("\n").map((line) => chalk3.white(line))
+    ]
+  );
   return config;
 }
 
@@ -844,8 +840,8 @@ async function runConfigWizard() {
 import fs7 from "fs-extra";
 import path6 from "path";
 import chalk4 from "chalk";
-import prompts4 from "prompts";
-import { execSync as execSync2 } from "child_process";
+import prompts from "prompts";
+import { execSync as execSync3 } from "child_process";
 var REGISTRY_REPO = "A5GARD/BIFROST";
 var REGISTRY_FILE = "dist/registry.bifrost";
 async function verifyPublicRepo(github) {
@@ -864,7 +860,7 @@ async function submitTemplate() {
   let config;
   if (!await fs7.pathExists(configPath)) {
     console.log(chalk4.yellow("\u26A0 config.bifrost not found\n"));
-    const { runWizard } = await prompts4({
+    const { runWizard } = await prompts({
       type: "confirm",
       name: "runWizard",
       message: "Would you like to run the config wizard to create it?",
@@ -883,7 +879,7 @@ async function submitTemplate() {
   if (!isPublic) {
     console.log(chalk4.red("\n\u274C Repository must be public"));
     console.log(chalk4.yellow("Please make your repository public before submitting"));
-    const { madePublic } = await prompts4({
+    const { madePublic } = await prompts({
       type: "confirm",
       name: "madePublic",
       message: "Have you made the repository public?",
@@ -913,7 +909,7 @@ async function submitTemplate() {
     console.log(`Plugins: ${chalk4.white(config.plugins.join(", "))}`);
   }
   console.log(chalk4.gray("\u2500".repeat(50)));
-  const { confirm } = await prompts4({
+  const { confirm } = await prompts({
     type: "confirm",
     name: "confirm",
     message: "Submit this template to the registry?",
@@ -933,13 +929,13 @@ async function submitTemplate() {
       tags: config.tags
     };
     console.log(chalk4.blue("\n\u{1F504} Forking registry repository..."));
-    execSync2(`gh repo fork ${REGISTRY_REPO} --clone=false`, { stdio: "inherit" });
-    const username = execSync2("gh api user -q .login", { encoding: "utf-8" }).trim();
+    execSync3(`gh repo fork ${REGISTRY_REPO} --clone=false`, { stdio: "inherit" });
+    const username = execSync3("gh api user -q .login", { encoding: "utf-8" }).trim();
     const forkRepo = `${username}/BIFROST`;
     console.log(chalk4.blue("\u{1F4E5} Cloning forked repository..."));
     const tempDir = path6.join(process.cwd(), ".bifrost-temp");
     await fs7.ensureDir(tempDir);
-    execSync2(`gh repo clone ${forkRepo} ${tempDir}`, { stdio: "inherit" });
+    execSync3(`gh repo clone ${forkRepo} ${tempDir}`, { stdio: "inherit" });
     console.log(chalk4.blue("\u{1F4CB} Fetching current registry..."));
     const registryUrl = `https://raw.githubusercontent.com/${REGISTRY_REPO}/main/${REGISTRY_FILE}`;
     const registryResponse = await fetch(registryUrl);
@@ -959,11 +955,11 @@ async function submitTemplate() {
     await fs7.writeJson(registryPath, registry, { spaces: 2 });
     console.log(chalk4.blue("\u{1F4BE} Committing changes..."));
     process.chdir(tempDir);
-    execSync2("git add .", { stdio: "inherit" });
-    execSync2(`git commit -m "Add/Update template: ${config.name}"`, { stdio: "inherit" });
-    execSync2("git push", { stdio: "inherit" });
+    execSync3("git add .", { stdio: "inherit" });
+    execSync3(`git commit -m "Add/Update template: ${config.name}"`, { stdio: "inherit" });
+    execSync3("git push", { stdio: "inherit" });
     console.log(chalk4.blue("\u{1F500} Creating pull request..."));
-    const prUrl = execSync2(
+    const prUrl = execSync3(
       `gh pr create --repo ${REGISTRY_REPO} --title "Add template: ${config.name}" --body "Submitting template ${config.name} to the registry.
 
 Platform: ${config.platform}
@@ -990,129 +986,430 @@ Description: ${config.description}"`,
   }
 }
 
-// src/cli.ts
+// src/index.ts
+var VERSION = "1.0.0";
 async function loadRegistry() {
-  const registryFile = Bun.file(new URL("../registry.bifrost", import.meta.url));
+  const registryFile = Bun.file(new URL("../dist/registry.bifrost", import.meta.url));
   return await registryFile.json();
 }
-async function runCLI(argv) {
-  const DEFAULT_STACKS = await loadRegistry();
-  const program = new Command();
-  program.name("@a5gard/bifrost").description("Create a new project with platform-agnostic templates").version("1.0.0").argument("[projectName]", "The project name").option("-t, --template <owner/repo>", "The template to use (format: owner/repo)").option("-p, --pkg-mgr <pm>", `Package manager to use (${PACKAGE_MANAGERS.join(", ")})`).option("--no-install", "Skip dependency installation").option("--list-templates", "List all available community templates").option("--wizard", "Run config.bifrost wizard").option("--submit", "Submit template to bifrost registry").option("-h, --help", "Show help").action(async (projectName, options) => {
-    if (options.help) {
-      showHelp();
-      process.exit(0);
-    }
-    if (options.listTemplates) {
-      showTemplates(DEFAULT_STACKS);
-      process.exit(0);
-    }
-    if (options.wizard) {
-      await runConfigWizard();
-      process.exit(0);
-    }
-    if (options.submit) {
-      await submitTemplate();
-      process.exit(0);
-    }
-    try {
-      if (options.pkgMgr && !PACKAGE_MANAGERS.includes(options.pkgMgr)) {
-        console.error(chalk5.red(`Invalid package manager. Must be one of: ${PACKAGE_MANAGERS.join(", ")}`));
-        process.exit(1);
-      }
-      let finalProjectName = projectName;
-      let finalStack = options.template;
-      let finalPackageManager = options.pkgMgr;
-      let finalInstall = options.noInstall === false;
-      const prompted = await promptForMissingOptions(
-        finalProjectName,
-        finalStack,
-        finalPackageManager,
-        finalInstall ? void 0 : false
-      );
-      finalProjectName = prompted.projectName;
-      finalStack = prompted.template;
-      finalPackageManager = prompted.packageManager;
-      finalInstall = prompted.install;
-      const gitPush = prompted.gitPush;
-      const runWizard = prompted.runWizard;
-      const submitToRegistry = prompted.submitToRegistry;
-      const validProjectName = toValidPackageName(finalProjectName);
-      await createProject({
-        projectName: validProjectName,
-        template: finalStack,
-        packageManager: finalPackageManager,
-        install: finalInstall,
-        gitPush
-      });
-      if (runWizard) {
-        await runConfigWizard();
-      }
-      if (submitToRegistry) {
-        await submitTemplate();
-      }
-    } catch (error) {
-      console.error();
-      console.error(chalk5.red("Error:"), error instanceof Error ? error.message : "Unknown error");
-      console.error();
-      process.exit(1);
-    }
+function drawBox2(title, content, footer) {
+  const width = 117;
+  const horizontalLine = "\u2500".repeat(width - 2);
+  console.log(`\u256D${horizontalLine}\u256E`);
+  console.log(`\u2502${title.padStart(Math.floor((width - 2 + title.length) / 2)).padEnd(width - 2)}\u2502`);
+  console.log(`\u251C${horizontalLine}\u2524`);
+  content.forEach((line) => {
+    console.log(`\u2502 ${line.padEnd(width - 4)} \u2502`);
   });
-  await program.parseAsync(argv);
+  if (footer) {
+    console.log(`\u251C${horizontalLine}\u2524`);
+    console.log(`\u2502${footer.padStart(Math.floor((width - 2 + footer.length) / 2)).padEnd(width - 2)}\u2502`);
+  }
+  console.log(`\u2570${horizontalLine}\u256F`);
 }
-function showHelp() {
-  console.log(`
-${chalk5.bold("Usage:")}
-
-  ${chalk5.cyan("$ bunx @a5gard/bifrost")} ${chalk5.gray("<projectName> <...options>")}
-
-${chalk5.bold("Examples:")}
-
-  ${chalk5.cyan("$ bunx @a5gard/bifrost")}
-  ${chalk5.cyan("$ bunx @a5gard/bifrost my-app")}
-  ${chalk5.cyan("$ bunx @a5gard/bifrost my-app --template remix-run/indie-template")}
-  ${chalk5.cyan("$ bunx @a5gard/bifrost my-app -s owner/repo -p bun")}
-  ${chalk5.cyan("$ bunx @a5gard/bifrost my-app -s owner/repo --no-install")}
-  ${chalk5.cyan("$ bunx @a5gard/bifrost --list-templates")}
-  ${chalk5.cyan("$ bunx @a5gard/bifrost --wizard")}
-  ${chalk5.cyan("$ bunx @a5gard/bifrost --submit")}
-
-${chalk5.bold("Options:")}
-
-  ${chalk5.cyan("--help, -h")}          Print this help message
-  ${chalk5.cyan("--version, -V")}       Print the CLI version
-  ${chalk5.cyan("--template, -s")}         Stack to use (format: owner/repo)
-  ${chalk5.cyan("--pkg-mgr, -p")}       Package manager (npm, pnpm, yarn, bun)
-  ${chalk5.cyan("--no-install")}        Skip dependency installation
-  ${chalk5.cyan("--list-templates")}    List all available community templates
-  ${chalk5.cyan("--wizard")}            Run config.bifrost wizard
-  ${chalk5.cyan("--submit")}            Submit template to bifrost registry
-  `);
+async function promptMainMenu() {
+  drawBox2(
+    "@a5gard/bifrost",
+    [
+      "Platform-agnostic project creator with extensible template system.",
+      "",
+      "Choose an action to get started."
+    ]
+  );
+  const { action } = await inquirer3.prompt([
+    {
+      type: "list",
+      name: "action",
+      message: "What would you like to do?",
+      choices: [
+        { name: "Create a new project", value: "create" },
+        { name: "config.bifrost wizard", value: "wizard" },
+        { name: "Submit template to bifrost registry", value: "submit" }
+      ]
+    }
+  ]);
+  return action;
 }
-function showTemplates(DEFAULT_STACKS) {
-  console.log();
-  console.log(chalk5.bold("Available Community Templates"));
-  console.log();
-  const groupedByPlatform = DEFAULT_STACKS.reduce((acc, template) => {
+async function promptProjectName() {
+  drawBox2(
+    "PROJECT SETUP",
+    [
+      "Enter a name for your new project.",
+      "",
+      "This will be used as the directory name and package name."
+    ]
+  );
+  const { projectName } = await inquirer3.prompt([
+    {
+      type: "input",
+      name: "projectName",
+      message: "What would you like to name your new project?",
+      validate: (input) => {
+        if (!input.trim()) return "Project name is required";
+        return true;
+      }
+    }
+  ]);
+  return projectName;
+}
+async function promptPlatform() {
+  drawBox2(
+    "SELECT PLATFORM",
+    [
+      "Choose the platform/framework for your new project.",
+      "",
+      "Available platforms are listed below."
+    ]
+  );
+  const platformChoices = Object.entries(PLATFORMS).map(([key, platform2]) => ({
+    name: platform2.name,
+    value: key
+  }));
+  const { platform } = await inquirer3.prompt([
+    {
+      type: "list",
+      name: "platform",
+      message: "Which platform would you like to use?",
+      choices: platformChoices
+    }
+  ]);
+  return platform;
+}
+async function promptTemplateChoice(platform) {
+  const platformData = PLATFORMS[platform];
+  if (!platformData.templates) {
+    return { useTemplate: false };
+  }
+  drawBox2(
+    "INSTALLATION TYPE",
+    [
+      "Choose between the platform default or select from available templates.",
+      "",
+      "Templates provide pre-configured setups for specific use cases."
+    ]
+  );
+  const { choice } = await inquirer3.prompt([
+    {
+      type: "list",
+      name: "choice",
+      message: "Do you prefer to use the platform's default install or would you like to opt for a template instead?",
+      choices: [
+        { name: "Platform Default", value: "default" },
+        { name: "Choose Template", value: "template" }
+      ]
+    }
+  ]);
+  if (choice === "default") {
+    const templateKeys = Object.keys(platformData.templates);
+    if (templateKeys.length === 1) {
+      return { useTemplate: true, template: platformData.templates[templateKeys[0]].repo };
+    }
+    drawBox2(
+      `${platformData.name.toUpperCase()} DEFAULT OPTIONS`,
+      [
+        "This platform offers multiple default starter options.",
+        "",
+        "Select the one that best fits your needs."
+      ]
+    );
+    const defaultChoices = Object.entries(platformData.templates).map(([key, tmpl]) => ({
+      name: `${tmpl.name} - ${tmpl.description}`,
+      value: tmpl.repo,
+      short: tmpl.name
+    }));
+    const { template: template2 } = await inquirer3.prompt([
+      {
+        type: "list",
+        name: "template",
+        message: "Which default would you like to use?",
+        choices: defaultChoices
+      }
+    ]);
+    return { useTemplate: true, template: template2 };
+  }
+  const registry = await loadRegistry();
+  const platformTemplates = registry.filter((t) => t.platform === platform);
+  if (platformTemplates.length === 0) {
+    console.log(chalk5.yellow("No community templates available for this platform. Using default."));
+    const templateKeys = Object.keys(platformData.templates);
+    return { useTemplate: true, template: platformData.templates[templateKeys[0]].repo };
+  }
+  drawBox2(
+    `${platformData.name.toUpperCase()} TEMPLATES`,
+    [
+      "Select a community template from the available options below.",
+      "",
+      "Each template includes specific configurations and best practices."
+    ]
+  );
+  const templateChoices = platformTemplates.map((t) => ({
+    name: `${t.owner}/${t.repo} - ${t.description}`,
+    value: `${t.owner}/${t.repo}`,
+    short: `${t.owner}/${t.repo}`
+  }));
+  const { template } = await inquirer3.prompt([
+    {
+      type: "list",
+      name: "template",
+      message: "Which template would you like to use?",
+      choices: templateChoices
+    }
+  ]);
+  return { useTemplate: true, template };
+}
+async function promptPackageManager() {
+  drawBox2(
+    "PACKAGE MANAGER",
+    [
+      "Select your preferred package manager for dependency installation.",
+      "",
+      "Supported: npm, pnpm, yarn, bun"
+    ]
+  );
+  const { packageManager } = await inquirer3.prompt([
+    {
+      type: "list",
+      name: "packageManager",
+      message: "Which package manager do you prefer?",
+      choices: PACKAGE_MANAGERS.map((pm) => ({ name: pm, value: pm }))
+    }
+  ]);
+  return packageManager;
+}
+async function promptAdditionalOptions() {
+  drawBox2(
+    "ADDITIONAL OPTIONS",
+    [
+      "Configure additional features and tools for your project.",
+      "",
+      "Would you like tailwind and its requirements to be installed and configured:"
+    ]
+  );
+  const { options } = await inquirer3.prompt([
+    {
+      type: "checkbox",
+      name: "options",
+      message: "Select the options you would like to include (use spacebar to toggle):",
+      choices: [
+        { name: "Using the base tailwind config", value: "tailwindBase" },
+        { name: "Using the preset ngin", value: "tailwindNgin" },
+        { name: "Pre-install MI\xD0GAR\xD0R UI components", value: "midgardr" },
+        { name: "Pre-install @a5gard/baldr icons", value: "baldr" },
+        { name: "Auto install the project's libraries once the project has initialized", value: "install", checked: true },
+        { name: "Auto create and push the first commit to GitHub", value: "gitPush" }
+      ]
+    }
+  ]);
+  return {
+    tailwindBase: options.includes("tailwindBase"),
+    tailwindNgin: options.includes("tailwindNgin"),
+    midgardr: options.includes("midgardr"),
+    baldr: options.includes("baldr"),
+    install: options.includes("install"),
+    gitPush: options.includes("gitPush")
+  };
+}
+function showTemplates(registry, platformFilter) {
+  let filteredTemplates = registry;
+  if (platformFilter) {
+    filteredTemplates = registry.filter((t) => t.platform === platformFilter);
+    if (filteredTemplates.length === 0) {
+      console.log(chalk5.yellow(`No templates found for platform: ${platformFilter}`));
+      return;
+    }
+  }
+  const groupedByPlatform = filteredTemplates.reduce((acc, template) => {
     if (!acc[template.platform]) {
       acc[template.platform] = [];
     }
     acc[template.platform].push(template);
     return acc;
   }, {});
-  Object.entries(groupedByPlatform).forEach(([platform, template]) => {
-    console.log(chalk5.bold.cyan(`${platform.toUpperCase()}`));
-    console.log();
-    template.forEach((template2) => {
-      console.log(`  ${chalk5.green("\u203A")} ${chalk5.bold(`${template2.owner}/${template2.repo}`)}`);
-      console.log(`    ${chalk5.gray(template2.description)}`);
-      console.log(`    ${chalk5.gray(`Tags: ${template2.tags.join(", ")}`)}`);
-      console.log();
-    });
-  });
+  console.log();
+  drawBox2(
+    "AVAILABLE COMMUNITY TEMPLATES",
+    Object.entries(groupedByPlatform).flatMap(([platform, templates]) => {
+      const lines = [
+        "",
+        chalk5.bold.cyan(platform.toUpperCase()),
+        ""
+      ];
+      templates.forEach((template) => {
+        lines.push(`  ${chalk5.green("\u203A")} ${chalk5.bold(`${template.owner}/${template.repo}`)}`);
+        lines.push(`    ${chalk5.gray(template.description)}`);
+        lines.push(`    ${chalk5.gray(`Tags: ${template.tags.join(", ")}`)}`);
+        lines.push("");
+      });
+      return lines;
+    })
+  );
+  console.log();
   console.log(chalk5.gray("Use any template with: ") + chalk5.cyan("bunx @a5gard/bifrost my-app --template owner/repo"));
   console.log();
 }
-
-// src/index.ts
-runCLI(process.argv);
+function showHelp() {
+  drawBox2(
+    "BIFROST CLI HELP",
+    [
+      chalk5.white("BIFR\xD6ST unifies the fragmented landscape of project starters. Instead of learning npx create-remix, npx create-next-app, npx create-vite, and so on\u2014use one CLI for all platforms with community-driven templates and a plugin system."),
+      chalk5.white("Whenever a platform has been selected, you have the option of using the default installer provided by the platform's creators, or you may opt instead to use a configured template that was created by other developers."),
+      chalk5.white("Templates are opinionated variants that will include file scaffolding, configurations in place to meet the needed requirements, route files, pre-installed libraries and more."),
+      chalk5.white("Allowing you to hit the ground running when starting a new project, instead of wasting time or getting bogged down with all the required to-do items whenever a new app is created."),
+      chalk5.white("Currently focusing on React-based platforms. Once the details are ironed out, that focus will be expanded upon however I can."),
+      "",
+      chalk5.white("BIFR\xD6ST is not only striving to fill a gap where no one else has even really attempted, but also introducing a plugin system that can be used with, alongside, or on its own with the default installer."),
+      chalk5.white("A plugin will contain everything needed to add that feature to your project. For example, one-time password authentication for Remix Run. The plugin will contain and install all required route files, create/update all required configuration files, and will ensure all required libraries are installed within the project."),
+      chalk5.white("Once the plugin's installation process has completed, other than setting up your own personal Resend account, the plugin will be ready to use."),
+      chalk5.white(""),
+      chalk5.white("Another benefit that has come from the plugin system: for developers that can't live with a one-template-fits-all lifestyle. Instead, create a bare-bones essential app where only the libraries, configs, and routes that are absolutely essential, no matter the scenario, are included."),
+      chalk5.white("At which time, instead of configuring several time-consuming full-stack variations, you can create plugins to fill in the needs of whatever use case you can think of. So instead of having several projects that need not only to be taken care of in all the forms that are required, where at times you will be updating the same configs and libraries across all variants."),
+      chalk5.white("Because we don't want to deal with all of the headaches that come along with it, not to mention the time spent going that route. In its place, have one app that will serve as the foundation for all the plugins."),
+      chalk5.white("In the end, there's one app and one plugin to take care of instead of updating the same auth library across 4, 5, or whatever number of applications."),
+      chalk5.white(""),
+      "",
+      chalk5.bold("Usage:"),
+      "",
+      `  ${chalk5.cyan("$ bunx @a5gard/bifrost")} ${chalk5.gray("<projectName> <...options>")}`,
+      "",
+      chalk5.bold("Examples:"),
+      "",
+      `  ${chalk5.cyan("$ bunx @a5gard/bifrost")}`,
+      `  ${chalk5.cyan("$ bunx @a5gard/bifrost my-app")}`,
+      `  ${chalk5.cyan("$ bunx @a5gard/bifrost my-app --template remix-run/indie-template")}`,
+      `  ${chalk5.cyan("$ bunx @a5gard/bifrost my-app -t owner/repo -p bun")}`,
+      `  ${chalk5.cyan("$ bunx @a5gard/bifrost my-app -t owner/repo --no-install")}`,
+      `  ${chalk5.cyan("$ bunx @a5gard/bifrost --list-templates")}`,
+      `  ${chalk5.cyan("$ bunx @a5gard/bifrost --list-templates remix")}`,
+      `  ${chalk5.cyan("$ bunx @a5gard/bifrost --wizard")}`,
+      `  ${chalk5.cyan("$ bunx @a5gard/bifrost --submit")}`,
+      "",
+      chalk5.bold("Options:"),
+      "",
+      `  ${chalk5.cyan("--help, -h")}          Print this help message`,
+      `  ${chalk5.cyan("--version, -V")}       Print the CLI version`,
+      `  ${chalk5.cyan("--template, -t")}      Template to use (format: owner/repo)`,
+      `  ${chalk5.cyan("--pkg-mgr, -p")}       Package manager (npm, pnpm, yarn, bun)`,
+      `  ${chalk5.cyan("--no-install")}        Skip dependency installation`,
+      `  ${chalk5.cyan("--list-templates")}    List all available community templates`,
+      `  ${chalk5.cyan("--wizard")}            Run config.bifrost wizard`,
+      `  ${chalk5.cyan("--submit")}            Submit template to bifrost registry`,
+      ""
+    ]
+  );
+}
+async function runCLI(argv) {
+  const registry = await loadRegistry();
+  const args = argv.slice(2);
+  const flags = {};
+  let projectName;
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === "--help" || arg === "-h") {
+      flags.help = true;
+    } else if (arg === "--version" || arg === "-V") {
+      flags.version = true;
+    } else if (arg === "--list-templates") {
+      flags.listTemplates = true;
+      if (args[i + 1] && !args[i + 1].startsWith("-")) {
+        flags.platform = args[++i];
+      }
+    } else if (arg === "--wizard") {
+      flags.wizard = true;
+    } else if (arg === "--submit") {
+      flags.submit = true;
+    } else if (arg === "--no-install") {
+      flags.noInstall = true;
+    } else if (arg === "--template" || arg === "-t") {
+      flags.template = args[++i];
+    } else if (arg === "--pkg-mgr" || arg === "-p") {
+      flags.pkgMgr = args[++i];
+    } else if (!arg.startsWith("-") && !projectName) {
+      projectName = arg;
+    }
+  }
+  if (flags.help) {
+    showHelp();
+    process.exit(0);
+  }
+  if (flags.version) {
+    console.log(`BIFR\xD6ST V${VERSION}`);
+    process.exit(0);
+  }
+  if (flags.listTemplates) {
+    showTemplates(registry, flags.platform);
+    process.exit(0);
+  }
+  if (flags.wizard) {
+    await runConfigWizard();
+    process.exit(0);
+  }
+  if (flags.submit) {
+    await submitTemplate();
+    process.exit(0);
+  }
+  try {
+    if (flags.pkgMgr && !PACKAGE_MANAGERS.includes(flags.pkgMgr)) {
+      console.error(chalk5.red(`Invalid package manager. Must be one of: ${PACKAGE_MANAGERS.join(", ")}`));
+      process.exit(1);
+    }
+    let action = "create";
+    let finalProjectName = projectName;
+    let finalTemplate = flags.template;
+    let finalPackageManager = flags.pkgMgr;
+    let finalInstall = flags.noInstall ? false : void 0;
+    let tailwindBase = false;
+    let tailwindNgin = false;
+    let midgardr = false;
+    let baldr = false;
+    let gitPush = false;
+    if (!projectName && !flags.template) {
+      action = await promptMainMenu();
+      if (action === "wizard") {
+        await runConfigWizard();
+        process.exit(0);
+      }
+      if (action === "submit") {
+        await submitTemplate();
+        process.exit(0);
+      }
+    }
+    if (!finalProjectName) {
+      finalProjectName = await promptProjectName();
+    }
+    if (!finalTemplate) {
+      const platform = await promptPlatform();
+      const templateChoice = await promptTemplateChoice(platform);
+      finalTemplate = templateChoice.template;
+    }
+    if (!finalPackageManager) {
+      finalPackageManager = await promptPackageManager();
+    }
+    const additionalOptions = await promptAdditionalOptions();
+    tailwindBase = additionalOptions.tailwindBase;
+    tailwindNgin = additionalOptions.tailwindNgin;
+    midgardr = additionalOptions.midgardr;
+    baldr = additionalOptions.baldr;
+    finalInstall = finalInstall !== void 0 ? finalInstall : additionalOptions.install;
+    gitPush = additionalOptions.gitPush;
+    const validProjectName = toValidPackageName(finalProjectName);
+    await createProject({
+      projectName: validProjectName,
+      template: finalTemplate,
+      packageManager: finalPackageManager,
+      install: finalInstall,
+      gitPush,
+      tailwindBase,
+      tailwindNgin,
+      midgardr,
+      baldr
+    });
+  } catch (error) {
+    console.error();
+    console.error(chalk5.red("Error:"), error instanceof Error ? error.message : "Unknown error");
+    console.error();
+    process.exit(1);
+  }
+}
+export {
+  runCLI
+};
