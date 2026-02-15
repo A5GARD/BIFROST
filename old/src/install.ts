@@ -18,7 +18,7 @@ export async function installDependencies(
 export async function runPostInstallScripts(
   projectDir: string,
   packageManager: PackageManager,
-  scripts: string[]
+  scripts: string[] 
 ): Promise<void> {
   for (const script of scripts) {
     const runCommand = getPackageManagerCommand(packageManager, 'run');

@@ -1,3 +1,11 @@
+# @A5GARD/BIFROST
+
+> [!IMPORTANT] 
+>
+> A new version has been merged into the vscode extension devstack, with new and expanded upon functionality. All functionality pertaining to bifrost, bifrost-plugin and each of relevant registries has completely been merged with the extensions code base and its use contained entirely to vscode. This repo now only serves as a registry service for bifrost
+
+
+
 # bifrost
 
 Platform-agnostic project creator with extensible template system inspired by Remix Stacks.
@@ -79,6 +87,7 @@ It will then create config.bifrost for you with the submitted data, and if no va
   "name": "My Stack",
   "description": "A custom template for X platform",
   "platform": "remix",
+  "template": "v2-classic-compiler",
   "github": "owner/repo",
   "tags": ["react", "typescript", "tailwind"],
   "postInstall": ["setup", "db:generate"],
@@ -134,6 +143,7 @@ Add a `config.bifrost` to your repository root for enhanced functionality:
 
 
 > [!IMPORTANT]
+> 
 > ## Built to Last
 > 
 > This resource has been architected with obsolescence by design—a self-sustaining ecosystem using a decentralized package system built entirely on free infrastructure.
@@ -153,6 +163,8 @@ Add a `config.bifrost` to your repository root for enhanced functionality:
 > - Complete ownership of everything you've created
 > 
 > True decentralization means no single point of failure—including me.
+
+
 
 
 # bifrost-plugin
