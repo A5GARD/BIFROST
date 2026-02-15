@@ -1,37 +1,142 @@
 [
   {
-    "owner": "remix-run",
-    "repo": "indie-stack",
-    "description": "Remix Stack for indie developers",
+    "owner": "8an3",
+    "repo": "remixv2/templates/remix-tutorial",
+    "description": "Great for learning Remix",
     "platform": "remix-run",
     "tags": ["remix", "sqlite", "prisma"]
   },
   {
-    "owner": "remix-run",
-    "repo": "blues-stack",
-    "description": "Remix Stack with PostgreSQL",
+    "owner": "8an3",
+    "repo": "remixv2/templates/remix",
+    "description": "Standard Remix template",
     "platform": "remix-run",
     "tags": ["remix", "postgresql", "prisma"]
   },
   {
-    "owner": "remix-run",
-    "repo": "grunge-stack",
-    "description": "Remix Stack with AWS",
+    "owner": "8an3",
+    "repo": "remixv2/templates/remix-javascript",
+    "description": "Remix w/ plain JavaScript",
     "platform": "remix-run",
-    "tags": ["remix", "aws", "dynamodb"]
+    "tags": ["remix", "plain", "javascript"]
   },
   {
-    "owner": "vercel",
-    "repo": "next.js",
-    "description": "Next.js starter",
+    "owner": "8an3",
+    "repo": "remixv2/templates/express",
+    "description": "Configure w/ Express.js",
     "platform": "remix-run",
-    "tags": ["nextjs", "react", "vercel"]
+    "tags": ["express", "react", "vercel"]
+  },
+  {
+    "owner": "8an3",
+    "repo": "remixv2/templates/cloudflare-workers",
+    "description": "Optimized Remix app",
+    "platform": "remix-run",
+    "tags": ["cloudflare", "aws"]
+  },
+  {
+    "owner": "8an3",
+    "repo": "remixv2/templates/cloudflare",
+    "description": "Optimized for Cloudflare",
+    "platform": "remix-run",
+    "tags": ["cloudflare", "aws"]
+  },
+  {
+    "owner": "8an3",
+    "repo": "remixv2/templates/spa",
+    "description": "Remix in SPA mode",
+    "platform": "remix-run",
+    "tags": ["cloudflare", "spa"]
+  },
+  {
+    "owner": "8an3",
+    "repo": "remixv2/templates/classic-remix-compiler/remix",
+    "description": "Original Remix compiler setup",
+    "platform": "remix-run",
+    "tags": ["cloudflare", "aws"]
+  },
+  {
+    "owner": "8an3",
+    "repo": "remixv2/templates/classic-remix-compiler/arc",
+    "description": "Original Remix compiler setup with arc",
+    "platform": "remix-run",
+    "tags": ["cloudflare", "aws"]
+  },
+  {
+    "owner": "8an3",
+    "repo": "remixv2/templates/classic-remix-compiler/cloudflare-pages",
+    "description": "Original Remix compiler setup w/ cloudflare-pages",
+    "platform": "remix-run",
+    "tags": ["cloudflare", "aws"]
+  },
+  {
+    "owner": "8an3",
+    "repo": "remixv2/templates/classic-remix-compiler/cloudflare-workers",
+    "description": "Original Remix compiler setup w/ cloudflare-workers",
+    "platform": "remix-run",
+    "tags": ["cloudflare", "aws"]
+  },
+  {
+    "owner": "8an3",
+    "repo": "remixv2/templates/classic-remix-compiler/deno",
+    "description": "Original Remix compiler setup w/ deno",
+    "platform": "remix-run",
+    "tags": ["cloudflare", "aws"]
+  },
+  {
+    "owner": "8an3",
+    "repo": "remixv2/templates/classic-remix-compiler/fly",
+    "description": "Original Remix compiler setup w/ fly",
+    "platform": "remix-run",
+    "tags": ["cloudflare", "aws"]
+  },
+  {
+    "owner": "8an3",
+    "repo": "remixv2/templates/classic-remix-compiler/remix-javascript",
+    "description": "Original Remix compiler setup w/ remix-javascript",
+    "platform": "remix-run",
+    "tags": ["cloudflare", "aws"]
+  },
+  {
+    "owner": "facebook",
+    "repo": "create-react-app",
+    "description": "Standard React application",
+    "platform": "CRA",
+    "tags": ["cloudflare", "aws"]
   },
   {
     "owner": "vitejs",
-    "repo": "vite",
-    "description": "Vite starter template",
-    "platform": "remix-run",
-    "tags": ["vite", "react"]
+    "repo": "vite/packages/create-vite/template-react-ts",
+    "description": "Fast React development with Vite",
+    "platform": "Vite",
+    "tags": ["vitejs", "Vite"]
+  },
+  {
+    "owner": "vercel",
+    "repo": "next.js/examples/blog-starter",
+    "description": "The React Framework for Production",
+    "platform": "Next.js",
+    "tags": ["vercel", "next.js", "blog"]
+  },
+  {
+    "owner": "vuejs",
+    "repo": "create-vue",
+    "description": "Progressive JavaScript Framework",
+    "platform": "Vue",
+    "tags": ["vuejs", "Progressive"]
+  },
+  {
+    "owner": "sveltejs",
+    "repo": "kit",
+    "description": "Cybernetically enhanced web apps",
+    "platform": "svelte",
+    "tags": ["svelte", "kit"]
+  },
+  {
+    "owner": "withastro",
+    "repo": "astro/examples/basics",
+    "description": "Build faster websites",
+    "platform": "astro",
+    "tags": ["astro", "faster"]
   }
 ]
